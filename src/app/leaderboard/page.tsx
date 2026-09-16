@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { AppShell } from '@/components/layout/AppShell';
+import { TouchFeedback } from '@/components/layout/TouchFeedback';
 
 type LeaderboardEntry = {
   rank: number;
@@ -43,19 +44,20 @@ export default function LeaderboardPage() {
           <section className="flex items-end justify-center gap-3 pt-4">
             {[1, 0, 2].map((podiumIdx) => {
               const entry = top3[podiumIdx];
-              if (!entry) return <div key={podiumIdx} className="w-24" />;
               const isFirst = podiumIdx === 0;
               return (
-                <div key={podiumIdx} className="flex flex-col items-center w-24">
-                  <div className={`w-12 h-12 rounded-full ${PODIUM_COLORS[podiumIdx]} flex items-center justify-center text-lg font-bold shadow-md mb-1 ${isFirst ? 'w-14 h-14 text-xl' : ''}`}>
-                    {MEDAL_EMOJIS[podiumIdx]}
+                <TouchFeedback key={podiumIdx}>
+                  <div className="flex flex-col items-center w-24">
+                    <div className={'w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold shadow-md mb-1 ' + PODIUM_COLORS[podiumIdx] + (isFirst ? ' w-14 h-14 text-xl' : '')}>
+                      {MEDAL_EMOJIS[podiumIdx]}
+                    </div>
+                    <p className="text-xs font-bold text-gray-900 text-center truncate w-full">{entry?.display_name}</p>
+                    <p className="text-[10px] text-gray-500">{entry?.xp_total} XP</p>
+                    <div className={PODIUM_HEIGHTS[podiumIdx] + ' w-full rounded-t-xl mt-1 flex items-start justify-center pt-2 ' + PODIUM_COLORS[podiumIdx]}>
+                      <span className="text-white font-bold text-lg">{podiumIdx + 1}</span>
+                    </div>
                   </div>
-                  <p className="text-xs font-bold text-gray-900 text-center truncate w-full">{entry.display_name}</p>
-                  <p className="text-[10px] text-gray-500">{entry.xp_total} XP</p>
-                  <div className={`${PODIUM_HEIGHTS[podiumIdx]} w-full ${PODIUM_COLORS[podiumIdx]} rounded-t-xl mt-1 flex items-start justify-center pt-2`}>
-                    <span className="text-white font-bold text-lg">{podiumIdx + 1}</span>
-                  </div>
-                </div>
+                </TouchFeedback>
               );
             })}
           </section>
@@ -65,22 +67,24 @@ export default function LeaderboardPage() {
         <section>
           <div className="space-y-2">
             {rest.map((entry) => (
-              <div key={entry.rank} className="card-interactive p-3 flex items-center gap-3">
-                <span className="w-8 text-center text-sm font-bold text-gray-400">{entry.rank}</span>
-                <div className="w-9 h-9 rounded-full gradient-violet flex items-center justify-center text-white font-bold text-xs">
-                  {entry.display_name?.charAt(0) || '?'}
+              <TouchFeedback key={entry.rank}>
+                <div className="card-interactive p-3 flex items-center gap-3">
+                  <span className="w-8 text-center text-sm font-bold text-gray-400">{entry.rank}</span>
+                  <div className="w-9 h-9 rounded-full gradient-violet flex items-center justify-center text-white font-bold text-xs">
+                    {entry.display_name?.charAt(0) || '?'}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-gray-900 truncate">{entry.display_name}</p>
+                    <p className="text-xs text-gray-500">Lv.{entry.level} {entry.level_title}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-bold text-violet-primary">{entry.xp_total} XP</p>
+                    {entry.streak_days > 0 && (
+                      <p className="text-xs text-gray-400">🔥 {entry.streak_days}d</p>
+                    )}
+                  </div>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-gray-900 truncate">{entry.display_name}</p>
-                  <p className="text-xs text-gray-500">Lv.{entry.level} {entry.level_title}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-bold text-violet-primary">{entry.xp_total} XP</p>
-                  {entry.streak_days > 0 && (
-                    <p className="text-xs text-gray-400">🔥 {entry.streak_days}d</p>
-                  )}
-                </div>
-              </div>
+              </TouchFeedback>
             ))}
           </div>
         </section>

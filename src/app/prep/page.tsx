@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { AppShell } from '@/components/layout/AppShell';
 import Link from 'next/link';
+import { TouchFeedback } from '@/components/layout/TouchFeedback';
 
 type PrepExam = { id: string; exam_key: string; name: string; full_name: string; icon: string; color: string; description: string; tags: string[]; };
 type PrepGroup = { id: string; name: string; importance: string; group_number: number; topic_count: string; topics: { id: string; name: string; importance: string; }[]; };
@@ -48,11 +49,11 @@ export default function PrepPage() {
             <h3 className="font-bold text-gray-900 mb-3">Competitive Exams</h3>
             <div className="space-y-3">
               {exams.map((exam) => (
-                <button
-                  key={exam.exam_key}
-                  onClick={() => setSelectedExam(exam.exam_key)}
-                  className="card-interactive p-4 w-full text-left"
-                >
+                <TouchFeedback key={exam.exam_key}>
+                  <button
+                    onClick={() => setSelectedExam(exam.exam_key)}
+                    className="card-interactive p-4 w-full text-left"
+                  >
                   <div className="flex items-start gap-3">
                     <div className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl flex-shrink-0" style={{ backgroundColor: exam.color + '15' }}>
                       {exam.icon}
@@ -70,7 +71,8 @@ export default function PrepPage() {
                       )}
                     </div>
                   </div>
-                </button>
+                  </button>
+                </TouchFeedback>
               ))}
             </div>
           </section>
@@ -101,47 +103,51 @@ export default function PrepPage() {
               {groups.map((group) => {
                 const isExpanded = expandedGroup === group.id;
                 return (
-                  <div key={group.id} className="card-interactive overflow-hidden">
-                    <button
-                      onClick={() => setExpandedGroup(isExpanded ? '' : group.id)}
-                      className="w-full p-3 flex items-center justify-between text-left"
-                    >
-                      <div className="flex items-center gap-2 flex-1 min-w-0">
-                        <div className={`w-2 h-2 rounded-full flex-shrink-0 ${IMPORTANCE_COLORS[group.importance] || 'bg-gray-400'}`} />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold text-gray-900 truncate">{group.name}</p>
-                          <p className="text-xs text-gray-500">{group.topic_count} topics · {group.importance}</p>
-                        </div>
-                      </div>
-                      <svg className={`w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ${isExpanded ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-                      </svg>
-                    </button>
-                    {isExpanded && group.topics && (
-                      <div className="px-3 pb-3 space-y-2 border-t border-gray-100">
-                        {group.topics.map((topic) => (
-                          <div key={topic.id} className="flex items-start gap-2 py-2">
-                            <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${IMPORTANCE_COLORS[topic.importance] || 'bg-gray-300'}`} />
-                            <p className="text-sm text-gray-800">{topic.name}</p>
+                  <TouchFeedback key={group.id}>
+                    <div className="card-interactive overflow-hidden">
+                      <button
+                        onClick={() => setExpandedGroup(isExpanded ? '' : group.id)}
+                        className="w-full p-3 flex items-center justify-between text-left"
+                      >
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          <div className={`w-2 h-2 rounded-full flex-shrink-0 ${IMPORTANCE_COLORS[group.importance] || 'bg-gray-400'}`} />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-gray-900 truncate">{group.name}</p>
+                            <p className="text-xs text-gray-500">{group.topic_count} topics · {group.importance}</p>
                           </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                        </div>
+                        <svg className={`w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ${isExpanded ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                        </svg>
+                      </button>
+                      {isExpanded && group.topics && (
+                        <div className="px-3 pb-3 space-y-2 border-t border-gray-100">
+                          {group.topics.map((topic) => (
+                            <div key={topic.id} className="flex items-start gap-2 py-2">
+                              <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${IMPORTANCE_COLORS[topic.importance] || 'bg-gray-300'}`} />
+                              <p className="text-sm text-gray-800">{topic.name}</p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </TouchFeedback>
                 );
               })}
             </div>
 
-            <Link
-              href={`/videos?track=competitive`}
-              className="card-interactive p-3 mt-4 flex items-center gap-3 block"
-            >
-              <div className="w-10 h-10 rounded-xl gradient-rose flex items-center justify-center text-white text-lg">🎬</div>
-              <div>
-                <p className="text-sm font-semibold text-gray-900">Watch Prep Videos</p>
-                <p className="text-xs text-gray-500">YouTube lectures for this exam</p>
-              </div>
-            </Link>
+            <TouchFeedback>
+              <Link
+                href={`/videos?track=competitive`}
+                className="card-interactive p-3 mt-4 flex items-center gap-3 block"
+              >
+                <div className="w-10 h-10 rounded-xl gradient-rose flex items-center justify-center text-white text-lg">🎬</div>
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">Watch Prep Videos</p>
+                  <p className="text-xs text-gray-500">YouTube lectures for this exam</p>
+                </div>
+              </Link>
+            </TouchFeedback>
           </section>
         )}
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { AppShell } from '@/components/layout/AppShell';
+import { TouchFeedback } from '@/components/layout/TouchFeedback';
 
 type Profile = {
   display_name: string; xp_total: number; level: number; level_title: string;
@@ -32,14 +33,17 @@ export default function ProfilePage() {
     }).catch(() => setLoading(false));
   }, []);
 
-  const stats = profile ? [
-    { label: 'Total XP', value: profile.xp_total, icon: '⭐', color: 'bg-amber-50 text-amber-primary' },
-    { label: 'Level', value: `${profile.level}`, icon: '📊', color: 'bg-violet-glow text-violet-primary' },
-    { label: 'Study Hours', value: Math.round(profile.total_study_minutes / 60), icon: '⏱️', color: 'bg-mint-50 text-mint-primary' },
-    { label: 'Games Won', value: profile.games_won, icon: '🏆', color: 'bg-coral-50 text-coral-primary' },
-    { label: 'Best Streak', value: `${profile.longest_streak}d`, icon: '🔥', color: 'bg-rose-50 text-rose-primary' },
-    { label: 'Games Played', value: profile.games_played, icon: '🎮', color: 'bg-sky-50 text-sky-primary' },
-  ] : [];
+  const stats = [];
+  if (profile) {
+    stats.push(
+      { label: 'Total XP', value: profile.xp_total, icon: '⭐', color: 'bg-amber-50 text-amber-primary' },
+      { label: 'Level', value: `${profile.level}`, icon: '📊', color: 'bg-violet-glow text-violet-primary' },
+      { label: 'Study Hours', value: Math.round(profile.total_study_minutes / 60), icon: '⏱️', color: 'bg-mint-50 text-mint-primary' },
+      { label: 'Games Won', value: profile.games_won, icon: '🏆', color: 'bg-coral-50 text-coral-primary' },
+      { label: 'Best Streak', value: `${profile.longest_streak}d`, icon: '🔥', color: 'bg-rose-50 text-rose-primary' },
+      { label: 'Games Played', value: profile.games_played, icon: '🎮', color: 'bg-sky-50 text-sky-primary' },
+    );
+  }
 
   return (
     <AppShell>
@@ -60,13 +64,15 @@ export default function ProfilePage() {
         {/* Stats Grid */}
         <section className="grid grid-cols-3 gap-3">
           {stats.map((stat) => (
-            <div key={stat.label} className="card-interactive p-3 text-center">
-              <div className={`w-8 h-8 rounded-lg ${stat.color} flex items-center justify-center text-sm mx-auto mb-1`}>
+            <TouchFeedback key={stat.label}>
+              <div className="card-interactive p-3 text-center">
+              <div className={'w-8 h-8 rounded-lg flex items-center justify-center text-sm mx-auto mb-1 ' + stat.color}>
                 {stat.icon}
               </div>
               <p className="text-lg font-bold text-gray-900">{stat.value}</p>
               <p className="text-[10px] text-gray-500">{stat.label}</p>
             </div>
+          </TouchFeedback>
           ))}
         </section>
 
@@ -76,18 +82,20 @@ export default function ProfilePage() {
           {achievements.length > 0 ? (
             <div className="space-y-2">
               {achievements.map((ach, i) => (
-                <div key={i} className="card-interactive p-3 flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-violet-glow flex items-center justify-center text-lg flex-shrink-0">
-                    {ach.icon || '🏅'}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-semibold text-gray-900">{ach.title}</p>
-                      <span className={`tag text-[10px] ${TIER_COLORS[ach.tier] || ''}`}>{ach.tier}</span>
+                <TouchFeedback key={i}>
+                  <div className="card-interactive p-3 flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-violet-glow flex items-center justify-center text-lg flex-shrink-0">
+                      {ach.icon || '🏅'}
                     </div>
-                    <p className="text-xs text-gray-500">{ach.description}</p>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-semibold text-gray-900">{ach.title}</p>
+                        <span className={'tag text-[10px] ' + (TIER_COLORS[ach.tier] || '')}>{ach.tier}</span>
+                      </div>
+                      <p className="text-xs text-gray-500">{ach.description}</p>
+                    </div>
                   </div>
-                </div>
+                </TouchFeedback>
               ))}
             </div>
           ) : (

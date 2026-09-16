@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { AppShell } from '@/components/layout/AppShell';
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
+import { TouchFeedback } from '@/components/layout/TouchFeedback';
 
 type Unit = { id: string; name: string; unit_number: number; subject_id: string; };
 type Topic = { id: string; name: string; unit_id: string; number: string; importance: string; };
@@ -141,22 +142,23 @@ function SyllabusContent() {
             <h3 className="font-bold text-gray-900 mb-2">Subjects ({subjects.length})</h3>
             <div className="space-y-2">
               {subjects.map((subj, i) => (
-                <button
-                  key={subj.code}
-                  onClick={() => setSelectedSubject(subj.code)}
-                  className="card-interactive p-3 w-full text-left flex items-center gap-3"
-                >
-                  <div className={`w-10 h-10 rounded-xl ${COLORS[i % COLORS.length]} flex items-center justify-center font-bold text-xs flex-shrink-0`}>
-                    {subj.code.slice(-2)}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-900 truncate">{subj.name}</p>
-                    <p className="text-xs text-gray-500">{subj.code} · {subj.topic_count} topics</p>
-                  </div>
-                  <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-                  </svg>
-                </button>
+                <TouchFeedback key={subj.code}>
+                  <button
+                    onClick={() => setSelectedSubject(subj.code)}
+                    className="card-interactive p-3 w-full text-left flex items-center gap-3"
+                  >
+                    <div className={`w-10 h-10 rounded-xl ${COLORS[i % COLORS.length]} flex items-center justify-center font-bold text-xs flex-shrink-0`}>
+                      {subj.code.slice(-2)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-900 truncate">{subj.name}</p>
+                      <p className="text-xs text-gray-500">{subj.code} · {subj.topic_count} topics</p>
+                    </div>
+                    <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                    </svg>
+                  </button>
+                </TouchFeedback>
               ))}
             </div>
           </section>
@@ -185,38 +187,40 @@ function SyllabusContent() {
                 const unitTopics = topics.filter(t => t.unit_id === unit.name);
                 const isExpanded = expandedUnit === unit.name || units.length <= 4;
                 return (
-                  <div key={unit.name} className="card-interactive overflow-hidden">
-                    <button
-                      onClick={() => setExpandedUnit(isExpanded && units.length > 4 ? '' : unit.name)}
-                      className="w-full p-3 flex items-center justify-between text-left"
-                    >
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-lg bg-violet-glow flex items-center justify-center text-violet-primary font-bold text-xs">
-                          U{unit.unit_number}
-                        </div>
-                        <div>
-                          <p className="text-sm font-semibold text-gray-900">{unit.name}</p>
-                          <p className="text-xs text-gray-500">{unitTopics.length} topics</p>
-                        </div>
-                      </div>
-                      <svg className={`w-4 h-4 text-gray-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-                      </svg>
-                    </button>
-                    {isExpanded && (
-                      <div className="px-3 pb-3 space-y-2 border-t border-gray-100">
-                        {unitTopics.map((topic) => (
-                          <div key={topic.name} className="flex items-start gap-2 py-2">
-                            <div className="w-5 h-5 rounded-lg border-2 border-gray-200 flex-shrink-0 mt-0.5" />
-                            <div>
-                              <p className="text-sm text-gray-800">{topic.name}</p>
-                              <p className="text-xs text-gray-400">Topic {topic.number}</p>
-                            </div>
+                  <TouchFeedback key={unit.name}>
+                    <div className="card-interactive overflow-hidden">
+                      <button
+                        onClick={() => setExpandedUnit(isExpanded && units.length > 4 ? '' : unit.name)}
+                        className="w-full p-3 flex items-center justify-between text-left"
+                      >
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-lg bg-violet-glow flex items-center justify-center text-violet-primary font-bold text-xs">
+                            U{unit.unit_number}
                           </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                          <div>
+                            <p className="text-sm font-semibold text-gray-900">{unit.name}</p>
+                            <p className="text-xs text-gray-500">{unitTopics.length} topics</p>
+                          </div>
+                        </div>
+                        <svg className={`w-4 h-4 text-gray-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                        </svg>
+                      </button>
+                      {isExpanded && (
+                        <div className="px-3 pb-3 space-y-2 border-t border-gray-100">
+                          {unitTopics.map((topic) => (
+                            <div key={topic.name} className="flex items-start gap-2 py-2">
+                              <div className="w-5 h-5 rounded-lg border-2 border-gray-200 flex-shrink-0 mt-0.5" />
+                              <div>
+                                <p className="text-sm text-gray-800">{topic.name}</p>
+                                <p className="text-xs text-gray-400">Topic {topic.number}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </TouchFeedback>
                 );
               })}
             </div>

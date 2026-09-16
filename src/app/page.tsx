@@ -1,240 +1,139 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState, useCallback, useEffect } from 'react';
+import { motion } from 'framer-motion';
+import Link from 'next/link';
 import { AppShell } from '@/components/layout/AppShell';
 import { QuickGames } from '@/components/home/QuickGames';
-import Link from 'next/link';
+import { PullToRefresh } from '@/components/layout/PullToRefresh';
 
 const GRADIENTS = ['gradient-violet', 'gradient-coral', 'gradient-mint', 'gradient-rose', 'gradient-amber', 'gradient-sky'];
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-type Profile = {
-  display_name: string; xp_total: number; level: number; level_title: string;
-  streak_days: number; total_study_minutes: number; games_played: number;
-};
-type LevelDef = { level_number: number; title: string; xp_required: number; color: string; };
-type DailyChallenge = { title: string; description: string; progress: number; target_value: number; xp_reward: number; completed: boolean; };
-type Subject = { code: string; name: string; topic_count: string; done_count: string; };
-type PrepExam = { exam_key: string; name: string; full_name: string; icon: string; color: string; description: string; tags: string[]; };
-type TimetableEntry = { day_of_week: number; start_time: string; end_time: string; label: string; subject_code: string; location: string; faculty_initials: string; entry_type: string; };
-type TodayClass = TimetableEntry;
+type Profile = { name: string; streak: number; xp_total: number; level: number; avatar_url: string | null };
+type TodayTask = { title: string; type: string; done: boolean };
 
 export default function Home() {
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [levels, setLevels] = useState<LevelDef[]>([]);
-  const [challenges, setChallenges] = useState<DailyChallenge[]>([]);
-  const [subjects, setSubjects] = useState<Subject[]>([]);
-  const [exams, setExams] = useState<PrepExam[]>([]);
-  const [timetable, setTimetable] = useState<TimetableEntry[]>([]);
-  const [todayClasses, setTodayClasses] = useState<TodayClass[]>([]);
+  const [todayTasks, setTodayTasks] = useState<TodayTask[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetch('/api/profile').then(r => r.json()).then(d => setProfile(d.data)).catch(() => {});
-    fetch('/api/levels').then(r => r.json()).then(d => setLevels(d.data || [])).catch(() => {});
-    fetch('/api/challenges/daily').then(r => r.json()).then(d => setChallenges(d.data || [])).catch(() => {});
-    fetch('/api/subjects').then(r => r.json()).then(d => setSubjects(d.data || [])).catch(() => {});
-    fetch('/api/prep/exams').then(r => r.json()).then(d => setExams(d.data || [])).catch(() => {});
-    fetch('/api/timetable').then(r => r.json()).then(d => {
-      const entries = d.data || [];
-      setTimetable(entries);
-      const today = new Date().getDay();
-      setTodayClasses(entries.filter((e: TimetableEntry) => e.day_of_week === today && e.entry_type === 'lecture'));
-    }).catch(() => {});
+  const fetchData = useCallback(async () => {
+    try {
+      const [p, s] = await Promise.all([
+        fetch('/api/profile').then(r => r.ok ? r.json() : { data: null }),
+        fetch('/api/study').then(r => r.ok ? r.json() : { data: { today: [] } }),
+      ]);
+      if (p.data) setProfile(p.data);
+      if (s.data?.today) setTodayTasks(s.data.today);
+    } catch {}
+    setLoading(false);
   }, []);
 
-  const currentLevel = levels.find(l => l.level_number === profile?.level) || levels[2];
-  const nextLevel = levels.find(l => l.level_number === (profile?.level || 3) + 1);
-  const xpInLevel = profile ? profile.xp_total - (currentLevel?.xp_required || 0) : 0;
-  const xpForNext = nextLevel ? nextLevel.xp_required - (currentLevel?.xp_required || 0) : 300;
-  const progress = Math.min((xpInLevel / Math.max(xpForNext, 1)) * 100, 100);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
-  const totalTopics = subjects.reduce((sum, s) => sum + parseInt(s.topic_count || '0'), 0);
-  const totalDone = subjects.reduce((sum, s) => sum + parseInt(s.done_count || '0'), 0);
-  const syllabusProgress = totalTopics > 0 ? Math.round((totalDone / totalTopics) * 100) : 0;
+  const dayOfWeek = new Date().getDay();
+  const dayName = DAY_NAMES[dayOfWeek];
 
   const quickLinks = [
-    { href: '/syllabus', label: 'Syllabus', icon: '📚', color: 'bg-violet-glow text-violet-primary', gradient: 'gradient-violet' },
-    { href: '/prep', label: 'Exam Prep', icon: '🎯', color: 'bg-coral-50 text-coral-primary', gradient: 'gradient-coral' },
-    { href: '/timetable', label: 'Timetable', icon: '📅', color: 'bg-mint-50 text-mint-primary', gradient: 'gradient-mint' },
-    { href: '/videos', label: 'Videos', icon: '🎬', color: 'bg-rose-50 text-rose-primary', gradient: 'gradient-rose' },
-    { href: '/leaderboard', label: 'Ranks', icon: '🏆', color: 'bg-amber-50 text-amber-primary', gradient: 'gradient-amber' },
+    { href: '/syllabus', label: 'Syllabus', icon: '📚', gradient: GRADIENTS[0] },
+    { href: '/chat', label: 'AI Chat', icon: '🤖', gradient: GRADIENTS[1] },
+    { href: '/prep', label: 'Exam Prep', icon: '🎯', gradient: GRADIENTS[2] },
+    { href: '/timetable', label: 'Timetable', icon: '📅', gradient: GRADIENTS[3] },
+    { href: '/videos', label: 'Videos', icon: '🎥', gradient: GRADIENTS[4] },
+    { href: '/leaderboard', label: 'Ranks', icon: '🏆', gradient: GRADIENTS[5] },
   ];
 
   return (
     <AppShell>
-      <div className="px-4 pb-24 pt-2 space-y-5">
+      <PullToRefresh onRefresh={fetchData}>
+        <div className="px-4 pb-24 pt-2 space-y-5">
+          {/* Welcome */}
+          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-full gradient-violet flex items-center justify-center text-white text-lg font-bold shadow-lg">
+              {profile?.name?.[0]?.toUpperCase() || '?'}
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'} 👋</p>
+              <h1 className="text-lg font-bold text-gray-900">{profile?.name || 'Student'}</h1>
+            </div>
+            <div className="ml-auto flex items-center gap-1 bg-orange-50 px-3 py-1.5 rounded-full">
+              <span className="streak-fire">🔥</span>
+              <span className="text-sm font-bold text-orange-600">{profile?.streak || 0}</span>
+            </div>
+          </motion.div>
 
-        {/* XP + Level Bar */}
-        <section className="card-interactive p-4 animate-fade-in">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <div className="w-10 h-10 rounded-xl gradient-violet flex items-center justify-center text-white font-bold text-lg shadow-md">
-                {profile?.level || 3}
-              </div>
+          {/* Stats */}
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.1 }}
+            className="gradient-hero rounded-3xl p-5 text-white shadow-xl">
+            <div className="flex items-center justify-between mb-3">
               <div>
-                <p className="text-sm font-bold text-gray-900">{currentLevel?.title || 'Scholar'}</p>
-                <p className="text-xs text-gray-500">{profile?.xp_total || 550} XP</p>
+                <p className="text-white/80 text-xs">Total XP</p>
+                <p className="text-3xl font-black">{profile?.xp_total || 0}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-white/80 text-xs">Level</p>
+                <p className="text-2xl font-bold">{profile?.level || 1}</p>
               </div>
             </div>
-            <div className="text-right">
-              <p className="text-xs text-gray-400">Next Level</p>
-              <p className="text-sm font-bold text-violet-primary">{xpForNext - xpInLevel} XP away</p>
+            <div className="w-full h-2 bg-white/30 rounded-full overflow-hidden">
+              <motion.div initial={{ width: 0 }} animate={{ width: '45%' }} transition={{ delay: 0.5, duration: 1 }}
+                className="h-full bg-white rounded-full" />
             </div>
-          </div>
-          <div className="progress-bar-track">
-            <div className="progress-bar-fill gradient-violet" style={{ width: `${progress}%` }} />
-          </div>
-        </section>
+          </motion.div>
 
-        {/* Streak + Stats Row */}
-        <section className="grid grid-cols-3 gap-3">
-          <div className="card-interactive p-3 text-center">
-            <p className="streak-fire">🔥</p>
-            <p className="text-xl font-bold text-gray-900">{profile?.streak_days || 0}</p>
-            <p className="text-xs text-gray-500">Day Streak</p>
-          </div>
-          <div className="card-interactive p-3 text-center">
-            <p className="text-2xl">⏱️</p>
-            <p className="text-xl font-bold text-gray-900">{Math.round((profile?.total_study_minutes || 0) / 60)}h</p>
-            <p className="text-xs text-gray-500">Study Time</p>
-          </div>
-          <div className="card-interactive p-3 text-center">
-            <p className="text-2xl">🎮</p>
-            <p className="text-xl font-bold text-gray-900">{profile?.games_played || 0}</p>
-            <p className="text-xs text-gray-500">Games</p>
-          </div>
-        </section>
-
-        {/* Syllabus Progress */}
-        <section className="card-interactive p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-bold text-gray-900">Syllabus Progress</h3>
-            <span className="text-sm font-bold text-violet-primary">{syllabusProgress}%</span>
-          </div>
-          <div className="progress-bar-track mb-3">
-            <div className="progress-bar-fill gradient-mint" style={{ width: `${syllabusProgress}%` }} />
-          </div>
-          <div className="flex justify-between text-xs text-gray-500">
-            <span>{totalDone}/{totalTopics} topics done</span>
-            <span>{subjects.length} subjects</span>
-          </div>
-        </section>
-
-        {/* Daily Challenge */}
-        {challenges.length > 0 && (
-          <section className="rounded-2xl gradient-daily p-4 text-white shadow-card">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-lg">⚡</span>
-              <h3 className="font-bold">Daily Challenge</h3>
-            </div>
-            {challenges.slice(0, 2).map((c, i) => (
-              <div key={i} className="bg-white/15 rounded-xl p-3 mt-2 backdrop-blur-sm">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-semibold text-sm">{c.title}</p>
-                    <p className="text-xs text-white/70">{c.description}</p>
-                  </div>
-                  <span className="text-xs font-bold bg-white/20 px-2 py-1 rounded-lg">+{c.xp_reward} XP</span>
-                </div>
-                <div className="mt-2 h-1.5 bg-white/20 rounded-full overflow-hidden">
-                  <div className="h-full bg-white rounded-full transition-all" style={{ width: `${Math.min((c.progress / Math.max(c.target_value, 1)) * 100, 100)}%` }} />
-                </div>
-                <p className="text-xs text-white/60 mt-1">{c.progress}/{c.target_value}</p>
-              </div>
-            ))}
-          </section>
-        )}
-
-        {/* Today's Classes */}
-        {todayClasses.length > 0 && (
-          <section>
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="font-bold text-gray-900">Today&apos;s Classes</h3>
-              <Link href="/timetable" className="text-xs font-semibold text-violet-primary">View All</Link>
-            </div>
-            <div className="space-y-2">
-              {todayClasses.slice(0, 4).map((cls, i) => (
-                <div key={i} className="card-interactive p-3 flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-violet-glow flex items-center justify-center text-violet-primary font-bold text-xs">
-                    {cls.faculty_initials || 'TBA'}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-900 truncate">{cls.label}</p>
-                    <p className="text-xs text-gray-500">{cls.start_time?.slice(0,5)} - {cls.end_time?.slice(0,5)} · {cls.location}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Quick Games */}
-        <QuickGames />
-
-        {/* Quick Links Grid */}
-        <section>
-          <h3 className="font-bold text-gray-900 mb-3">Quick Access</h3>
-          <div className="grid grid-cols-3 gap-3">
-            {quickLinks.map((link) => (
-              <Link key={link.href} href={link.href} className="card-interactive p-3 text-center group">
-                <div className={`w-12 h-12 rounded-xl ${link.gradient} flex items-center justify-center text-2xl mx-auto mb-2 group-hover:scale-110 transition-transform shadow-sm`}>
-                  {link.icon}
-                </div>
-                <p className="text-xs font-semibold text-gray-700">{link.label}</p>
-              </Link>
-            ))}
-          </div>
-        </section>
-
-        {/* Competitive Exams Preview */}
-        {exams.length > 0 && (
-          <section>
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="font-bold text-gray-900">Exam Prep</h3>
-              <Link href="/prep" className="text-xs font-semibold text-violet-primary">See All</Link>
-            </div>
-            <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">
-              {exams.slice(0, 5).map((exam) => (
-                <Link key={exam.exam_key} href={`/prep/${exam.exam_key}`} className="min-w-[140px] card-interactive p-3 flex-shrink-0">
-                  <p className="text-2xl mb-1">{exam.icon}</p>
-                  <p className="text-sm font-bold text-gray-900">{exam.name}</p>
-                  <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{exam.description}</p>
-                </Link>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Subjects Preview */}
-        {subjects.length > 0 && (
-          <section>
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="font-bold text-gray-900">My Subjects</h3>
-              <Link href="/syllabus" className="text-xs font-semibold text-violet-primary">View All</Link>
-            </div>
-            <div className="space-y-2">
-              {subjects.slice(0, 4).map((subj) => {
-                const done = parseInt(subj.done_count || '0');
-                const total = parseInt(subj.topic_count || '0');
-                const pct = total > 0 ? Math.round((done / total) * 100) : 0;
-                return (
-                  <Link key={subj.code} href={`/syllabus?highlight=${subj.code}`} className="card-interactive p-3 block">
-                    <div className="flex items-center justify-between mb-1">
-                      <p className="text-sm font-semibold text-gray-900 truncate">{subj.name}</p>
-                      <span className="text-xs font-bold text-violet-primary ml-2">{pct}%</span>
-                    </div>
-                    <div className="progress-bar-track">
-                      <div className="progress-bar-fill gradient-violet" style={{ width: `${pct}%` }} />
-                    </div>
-                    <p className="text-xs text-gray-400 mt-1">{done}/{total} topics · {subj.code}</p>
+          {/* Quick Links */}
+          <div>
+            <h2 className="font-bold text-gray-900 text-lg mb-3">Quick Links</h2>
+            <div className="grid grid-cols-3 gap-2">
+              {quickLinks.map((link, i) => (
+                <motion.div key={link.href} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.2 + i * 0.05 }}>
+                  <Link href={link.href} className="block text-center mobile-card p-3">
+                    <motion.div whileTap={{ scale: 0.9 }}
+                      className={'w-10 h-10 rounded-xl mx-auto mb-1.5 flex items-center justify-center bg-gradient-to-br ' + link.gradient + ' shadow-sm'}>
+                      <span className="text-lg">{link.icon}</span>
+                    </motion.div>
+                    <span className="text-[10px] font-semibold text-gray-600">{link.label}</span>
                   </Link>
-                );
-              })}
+                </motion.div>
+              ))}
             </div>
-          </section>
-        )}
+          </div>
 
-      </div>
+          {/* Quick Games */}
+          <QuickGames />
+
+          {/* Today's Tasks */}
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="font-bold text-gray-900 text-lg">Today — {dayName}</h2>
+              <Link href="/timetable" className="text-xs font-semibold text-violet-primary">Full Timetable</Link>
+            </div>
+            {todayTasks.length === 0 ? (
+              <div className="mobile-card p-4 text-center text-gray-400 text-sm">
+                No tasks scheduled for today 🎉
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {todayTasks.slice(0, 4).map((task, i) => (
+                  <motion.div key={i} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.4 + i * 0.05 }}
+                    className="mobile-list-item bg-white rounded-xl shadow-sm">
+                    <div className={'w-8 h-8 rounded-lg flex items-center justify-center text-sm ' +
+                      (task.type === 'lecture' ? 'bg-violet-100 text-violet-600' :
+                       task.type === 'revision' ? 'bg-amber-100 text-amber-600' : 'bg-green-100 text-green-600')}>
+                      {task.type === 'lecture' ? '📖' : task.type === 'revision' ? '📝' : '✅'}
+                    </div>
+                    <span className="flex-1 text-sm font-medium text-gray-700 truncate">{task.title}</span>
+                    {task.done && <span className="text-green-500 text-xs">Done</span>}
+                  </motion.div>
+                ))}
+              </div>
+            )}
+          </motion.div>
+        </div>
+      </PullToRefresh>
     </AppShell>
   );
 }
