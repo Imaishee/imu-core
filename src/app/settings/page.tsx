@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import { AppShell } from '@/components/layout/AppShell';
 import { setVolume, setMute, getVolume, getMute } from '@/lib/sounds';
+import { motion } from 'framer-motion';
+import { TouchFeedback } from '@/components/layout/TouchFeedback';
 
 const MAJORS = [
   'Geography', 'Philosophy', 'English', 'History', 'Political Science',
@@ -108,38 +110,47 @@ export default function SettingsPage() {
     return 'Soft';
   };
 
+  const tabs = [
+    { key: 'profile' as const, label: 'Profile', icon: '👤' },
+    { key: 'appearance' as const, label: 'Appearance', icon: '🎨' },
+    { key: 'sound' as const, label: 'Sound', icon: '🔊' },
+  ];
+
   return (
     <AppShell>
       <div className="px-4 pb-24 pt-2">
         {/* Header */}
-        <div className="flex items-center justify-between mb-4">
+        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
+          className="flex items-center justify-between mb-4">
           <h1 className="text-2xl font-bold text-gray-900 font-display">Settings</h1>
-          <button
-            onClick={save}
-            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
-              saved ? 'bg-green-500 text-white' : 'bg-violet-primary text-white hover:bg-violet-dark'
-            }`}
-          >
-            {saved ? '✓ Saved' : 'Save'}
-          </button>
-        </div>
+          <TouchFeedback>
+            <button
+              onClick={save}
+              className={'px-4 py-1.5 rounded-full text-sm font-medium transition-all ' +
+                (saved ? 'bg-green-500 text-white' : 'bg-violet-primary text-white hover:bg-violet-dark')}
+            >
+              {saved ? '✓ Saved' : 'Save'}
+            </button>
+          </TouchFeedback>
+        </motion.div>
 
         {/* Tabs */}
         <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-6">
-          {(['profile', 'appearance', 'sound'] as const).map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
-                activeTab === tab ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              {tab === 'profile' ? 'Profile' : tab === 'appearance' ? 'Appearance' : 'Sound'}
-            </button>
+          {tabs.map((tab) => (
+            <TouchFeedback key={tab.key}>
+              <button
+                onClick={() => setActiveTab(tab.key)}
+                className={'flex-1 py-2 rounded-lg text-sm font-medium transition-all ' +
+                  (activeTab === tab.key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700')}
+              >
+                {tab.icon} {tab.label}
+              </button>
+            </TouchFeedback>
           ))}
         </div>
 
-        <div className="space-y-6">
+        <motion.div key={activeTab} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.2 }} className="space-y-6">
           {activeTab === 'profile' && (
             <>
               <div>
@@ -157,17 +168,17 @@ export default function SettingsPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Major Subject</label>
                 <div className="grid grid-cols-2 gap-2">
                   {MAJORS.map((m) => (
-                    <button
-                      key={m}
-                      onClick={() => update('major', m)}
-                      className={`px-3 py-2 rounded-xl text-sm font-medium transition-all ${
-                        profile.major === m
-                          ? 'bg-violet-primary text-white shadow-sm'
-                          : 'bg-white text-gray-600 border border-gray-200 hover:border-violet-primary/50'
-                      }`}
-                    >
-                      {m}
-                    </button>
+                    <TouchFeedback key={m}>
+                      <button
+                        onClick={() => update('major', m)}
+                        className={'px-3 py-2 rounded-xl text-sm font-medium transition-all w-full ' +
+                          (profile.major === m
+                            ? 'bg-violet-primary text-white shadow-sm'
+                            : 'bg-white text-gray-600 border border-gray-200 hover:border-violet-primary/50')}
+                      >
+                        {m}
+                      </button>
+                    </TouchFeedback>
                   ))}
                 </div>
               </div>
@@ -176,17 +187,17 @@ export default function SettingsPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Minor Subject</label>
                 <div className="grid grid-cols-2 gap-2">
                   {MAJORS.map((m) => (
-                    <button
-                      key={m}
-                      onClick={() => update('minor', m)}
-                      className={`px-3 py-2 rounded-xl text-sm font-medium transition-all ${
-                        profile.minor === m
-                          ? 'bg-coral-primary text-white shadow-sm'
-                          : 'bg-white text-gray-600 border border-gray-200 hover:border-coral-primary/50'
-                      }`}
-                    >
-                      {m}
-                    </button>
+                    <TouchFeedback key={m}>
+                      <button
+                        onClick={() => update('minor', m)}
+                        className={'px-3 py-2 rounded-xl text-sm font-medium transition-all w-full ' +
+                          (profile.minor === m
+                            ? 'bg-coral-primary text-white shadow-sm'
+                            : 'bg-white text-gray-600 border border-gray-200 hover:border-coral-primary/50')}
+                      >
+                        {m}
+                      </button>
+                    </TouchFeedback>
                   ))}
                 </div>
               </div>
@@ -196,15 +207,15 @@ export default function SettingsPage() {
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">Semester</label>
                   <div className="grid grid-cols-4 gap-1.5">
                     {SEMESTERS.map((s) => (
-                      <button
-                        key={s}
-                        onClick={() => update('semester', s)}
-                        className={`py-2 rounded-lg text-sm font-medium transition-all ${
-                          profile.semester === s ? 'bg-violet-primary text-white' : 'bg-white text-gray-600 border border-gray-200'
-                        }`}
-                      >
-                        {s}
-                      </button>
+                      <TouchFeedback key={s}>
+                        <button
+                          onClick={() => update('semester', s)}
+                          className={'py-2 rounded-lg text-sm font-medium transition-all w-full ' +
+                            (profile.semester === s ? 'bg-violet-primary text-white' : 'bg-white text-gray-600 border border-gray-200')}
+                        >
+                          {s}
+                        </button>
+                      </TouchFeedback>
                     ))}
                   </div>
                 </div>
@@ -212,15 +223,15 @@ export default function SettingsPage() {
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">Year</label>
                   <div className="grid grid-cols-2 gap-1.5">
                     {YEARS.map((y) => (
-                      <button
-                        key={y}
-                        onClick={() => update('year', y)}
-                        className={`py-2 rounded-lg text-sm font-medium transition-all ${
-                          profile.year === y ? 'bg-violet-primary text-white' : 'bg-white text-gray-600 border border-gray-200'
-                        }`}
-                      >
-                        {y}
-                      </button>
+                      <TouchFeedback key={y}>
+                        <button
+                          onClick={() => update('year', y)}
+                          className={'py-2 rounded-lg text-sm font-medium transition-all w-full ' +
+                            (profile.year === y ? 'bg-violet-primary text-white' : 'bg-white text-gray-600 border border-gray-200')}
+                        >
+                          {y}
+                        </button>
+                      </TouchFeedback>
                     ))}
                   </div>
                 </div>
@@ -244,17 +255,17 @@ export default function SettingsPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-3">Accent Color</label>
                 <div className="flex gap-3">
                   {ACCENT_COLORS.map((c) => (
-                    <button
-                      key={c.value}
-                      onClick={() => update('accentColor', c.value)}
-                      className={`w-10 h-10 rounded-full transition-all ${
-                        profile.accentColor === c.value
-                          ? 'ring-2 ring-offset-2 ring-gray-400 scale-110'
-                          : 'hover:scale-105'
-                      }`}
-                      style={{ backgroundColor: c.value }}
-                      title={c.name}
-                    />
+                    <TouchFeedback key={c.value}>
+                      <button
+                        onClick={() => update('accentColor', c.value)}
+                        className={'w-10 h-10 rounded-full transition-all ' +
+                          (profile.accentColor === c.value
+                            ? 'ring-2 ring-offset-2 ring-gray-400 scale-110'
+                            : 'hover:scale-105')}
+                        style={{ backgroundColor: c.value }}
+                        title={c.name}
+                      />
+                    </TouchFeedback>
                   ))}
                 </div>
               </div>
@@ -263,17 +274,17 @@ export default function SettingsPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-3">Font Size</label>
                 <div className="flex gap-2">
                   {FONT_SIZES.map((f) => (
-                    <button
-                      key={f.value}
-                      onClick={() => update('fontSize', f.value)}
-                      className={`flex-1 py-3 rounded-xl text-sm font-medium transition-all ${
-                        profile.fontSize === f.value
-                          ? 'bg-violet-primary text-white shadow-sm'
-                          : 'bg-white text-gray-600 border border-gray-200'
-                      }`}
-                    >
-                      {f.label}
-                    </button>
+                    <TouchFeedback key={f.value}>
+                      <button
+                        onClick={() => update('fontSize', f.value)}
+                        className={'flex-1 py-3 rounded-xl text-sm font-medium transition-all ' +
+                          (profile.fontSize === f.value
+                            ? 'bg-violet-primary text-white shadow-sm'
+                            : 'bg-white text-gray-600 border border-gray-200')}
+                      >
+                        {f.label}
+                      </button>
+                    </TouchFeedback>
                   ))}
                 </div>
               </div>
@@ -313,28 +324,31 @@ export default function SettingsPage() {
                 <div className="mb-6">
                   <div className="flex items-center">
                     <label className="text-sm font-medium text-gray-700 mr-3">Mute Sounds</label>
-                    <button
-                      onClick={handleMuteToggle}
-                      className={`flex items-center px-3 py-2 rounded-xl text-sm font-medium transition-all ${
-                        muted ? 'bg-red-500 text-white' : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
-                      }`}
-                    >
-                      {muted ? 'Unmute' : 'Mute'}
-                      <span className="ml-2">{muted ? '🔇' : '🔊'}</span>
-                    </button>
+                    <TouchFeedback>
+                      <button
+                        onClick={handleMuteToggle}
+                        className={'flex items-center px-3 py-2 rounded-xl text-sm font-medium transition-all ' +
+                          (muted ? 'bg-red-500 text-white' : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50')}
+                      >
+                        {muted ? 'Unmute' : 'Mute'}
+                        <span className="ml-2">{muted ? '🔇' : '🔊'}</span>
+                      </button>
+                    </TouchFeedback>
                   </div>
                   <p className="text-xs text-gray-500 mt-1">Toggle sound on or off for all games</p>
                 </div>
 
                 <div className="mb-4">
-                  <button
-                    onClick={() => {
-                      import('@/lib/sounds').then(({ playSound }) => { playSound('click'); });
-                    }}
-                    className="flex items-center px-4 py-3 rounded-xl text-sm font-medium transition-all bg-violet-primary text-white hover:bg-violet-dark"
-                  >
-                    ▶️ Test Sound
-                  </button>
+                  <TouchFeedback>
+                    <button
+                      onClick={() => {
+                        import('@/lib/sounds').then(({ playSound }) => { playSound('click'); });
+                      }}
+                      className="flex items-center px-4 py-3 rounded-xl text-sm font-medium transition-all bg-violet-primary text-white hover:bg-violet-dark"
+                    >
+                      ▶️ Test Sound
+                    </button>
+                  </TouchFeedback>
                 </div>
 
                 <div className="flex items-center">
@@ -349,7 +363,7 @@ export default function SettingsPage() {
               </div>
             </>
           )}
-        </div>
+        </motion.div>
       </div>
     </AppShell>
   );

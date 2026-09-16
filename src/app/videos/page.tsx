@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { AppShell } from '@/components/layout/AppShell';
+import { motion } from 'framer-motion';
+import { TouchFeedback } from '@/components/layout/TouchFeedback';
 
 type Video = {
   id: string; video_key: string; youtube_id: string; title: string; channel: string;
@@ -32,90 +34,93 @@ export default function VideosPage() {
   return (
     <AppShell>
       <div className="px-4 pb-24 pt-2 space-y-4">
-        <div>
+        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
           <h1 className="text-2xl font-bold text-gray-900 font-display">Video Library</h1>
           <p className="text-sm text-gray-500">YouTube lectures &amp; prep videos</p>
-        </div>
+        </motion.div>
 
         {/* Track Filter */}
         <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
-          <button
-            onClick={() => setFilter('')}
-            className={`px-4 py-2 rounded-xl text-sm font-semibold whitespace-nowrap transition-all ${
-              !filter ? 'tab-active' : 'tab-inactive'
-            }`}
-          >
-            All ({videos.length})
-          </button>
+          <TouchFeedback>
+            <button
+              onClick={() => setFilter('')}
+              className={'mobile-tab ' + (!filter ? 'active' : '')}
+            >
+              All ({videos.length})
+            </button>
+          </TouchFeedback>
           {tracks.map((track) => {
             const info = TRACK_INFO[track] || { label: track, icon: '📹', color: 'gradient-violet' };
             const count = videos.filter(v => v.track === track).length;
             return (
-              <button
-                key={track}
-                onClick={() => setFilter(track)}
-                className={`px-4 py-2 rounded-xl text-sm font-semibold whitespace-nowrap transition-all ${
-                  filter === track ? 'tab-active' : 'tab-inactive'
-                }`}
-              >
-                {info.icon} {info.label} ({count})
-              </button>
+              <TouchFeedback key={track}>
+                <button
+                  onClick={() => setFilter(track)}
+                  className={'mobile-tab ' + (filter === track ? 'active' : '')}
+                >
+                  {info.icon} {info.label} ({count})
+                </button>
+              </TouchFeedback>
             );
           })}
         </div>
 
         {/* Videos */}
         <div className="space-y-3">
-          {filteredVideos.map((video) => (
-            <a
-              key={video.id}
-              href={video.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="card-interactive p-3 block group"
-            >
-              <div className="flex items-start gap-3">
-                <div className="w-24 h-16 rounded-xl bg-gray-900 flex items-center justify-center flex-shrink-0 relative overflow-hidden">
-                  <img
-                    src={`https://img.youtube.com/vi/${video.youtube_id}/mqdefault.jpg`}
-                    alt={video.title}
-                    className="w-full h-full object-cover"
-                    loading="lazy"
-                  />
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="w-8 h-8 rounded-full bg-white/90 flex items-center justify-center shadow-lg">
-                      <svg className="w-3 h-3 text-gray-900 ml-0.5" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M8 5v14l11-7z" />
-                      </svg>
+          {filteredVideos.map((video, i) => (
+            <TouchFeedback key={video.id}>
+              <a
+                href={video.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="card-interactive p-3 block group"
+              >
+                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.04 }}
+                  className="flex items-start gap-3">
+                  <div className="w-24 h-16 rounded-xl bg-gray-900 flex items-center justify-center flex-shrink-0 relative overflow-hidden">
+                    <img
+                      src={'https://img.youtube.com/vi/' + video.youtube_id + '/mqdefault.jpg'}
+                      alt={video.title}
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                    />
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="w-8 h-8 rounded-full bg-white/90 flex items-center justify-center shadow-lg">
+                        <svg className="w-3 h-3 text-gray-900 ml-0.5" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M8 5v14l11-7z" />
+                        </svg>
+                      </div>
                     </div>
                   </div>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-gray-900 line-clamp-2 group-hover:text-violet-primary transition-colors">
-                    {video.oembed_title || video.title}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">{video.oembed_author || video.channel}</p>
-                  <div className="flex items-center gap-2 mt-1">
-                    {video.language && (
-                      <span className="tag bg-gray-100 text-gray-600 text-[10px] uppercase">{video.language}</span>
-                    )}
-                    {video.duration_display && (
-                      <span className="text-xs text-gray-400">{video.duration_display}</span>
-                    )}
-                    <span className="tag bg-violet-glow text-violet-primary text-[10px]">
-                      {TRACK_INFO[video.track]?.label || video.track}
-                    </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-gray-900 line-clamp-2 group-hover:text-violet-primary transition-colors">
+                      {video.oembed_title || video.title}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">{video.oembed_author || video.channel}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      {video.language && (
+                        <span className="tag bg-gray-100 text-gray-600 text-[10px] uppercase">{video.language}</span>
+                      )}
+                      {video.duration_display && (
+                        <span className="text-xs text-gray-400">{video.duration_display}</span>
+                      )}
+                      <span className="tag bg-violet-glow text-violet-primary text-[10px]">
+                        {TRACK_INFO[video.track]?.label || video.track}
+                      </span>
+                    </div>
                   </div>
-                </div>
-              </div>
-            </a>
+                </motion.div>
+              </a>
+            </TouchFeedback>
           ))}
           {filteredVideos.length === 0 && !loading && (
-            <div className="card-interactive p-8 text-center">
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+              className="card-interactive p-8 text-center">
               <p className="text-4xl mb-2">📹</p>
               <p className="font-bold text-gray-900">No videos yet</p>
               <p className="text-sm text-gray-500">Videos will appear as they&apos;re added</p>
-            </div>
+            </motion.div>
           )}
         </div>
 
