@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "173378969031",
+    "project_id": "im-u-f2201",
+    "storage_bucket": "im-u-f2201.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:173378969031:android:717c66c5f4eeb000c24de2",
+        "android_client_info": {
+          "package_name": "com.imu"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBcbHWMaou4JZYaYqbUWK01w0zUwsqKtu0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
