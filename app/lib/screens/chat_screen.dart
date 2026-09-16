@@ -1,11 +1,15 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:image_picker/image_picker.dart';
 import '../providers/chat_provider.dart';
+import '../constants/app_constants.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
   final String conversationId;
-  const ChatScreen({super.key, required this.conversationId});
+  final String? initialPrompt;
+  const ChatScreen({super.key, required this.conversationId, this.initialPrompt});
 
   @override
   ConsumerState<ChatScreen> createState() => _ChatScreenState();
@@ -15,6 +19,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   final _inputController = TextEditingController();
   final _scrollController = ScrollController();
   bool _isStreaming = false;
+  File? _pendingImage;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialPrompt != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _inputController.text = widget.initialPrompt!;
+        _sendMessage();
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -35,14 +51,34 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     });
   }
 
+  Future<void> _pickImage() async {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(source: ImageSource.gallery, imageQuality: 70, maxWidth: 1024);
+    if (picked != null) {
+      setState(() => _pendingImage = File(picked.path));
+    }
+  }
+
+  Future<void> _takePhoto() async {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(source: ImageSource.camera, imageQuality: 70, maxWidth: 1024);
+    if (picked != null) {
+      setState(() => _pendingImage = File(picked.path));
+    }
+  }
+
   Future<void> _sendMessage() async {
     final text = _inputController.text.trim();
-    if (text.isEmpty || _isStreaming) return;
+    if ((text.isEmpty && _pendingImage == null) || _isStreaming) return;
 
     _inputController.clear();
-    setState(() => _isStreaming = true);
+    setState(() {
+      _isStreaming = true;
+      _pendingImage = null;
+    });
 
-    await ref.read(messagesProvider(widget.conversationId).notifier).sendMessage(text);
+    final msgText = text.isNotEmpty ? text : 'Analyze this image';
+    await ref.read(messagesProvider(widget.conversationId).notifier).sendMessage(msgText);
 
     setState(() => _isStreaming = false);
     _scrollToBottom();
@@ -52,20 +88,26 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   Widget build(BuildContext context) {
     final messages = ref.watch(messagesProvider(widget.conversationId));
 
-    // Auto-scroll when new messages arrive
-    ref.listen<List<dynamic>>(messagesProvider(widget.conversationId), (prev, next) {
-      if (next.length > (prev?.length ?? 0)) {
-        _scrollToBottom();
-      }
-    });
-
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
           onPressed: () => Navigator.pop(context),
           icon: const Icon(Icons.arrow_back_ios, size: 20),
         ),
-        title: const Text("IM'U", style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
+        title: Row(
+          children: [
+            const Text("IM'U", style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: const Color(0xFFA78BFA).withAlpha(30),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(AppConstants.appVersion, style: const TextStyle(fontSize: 9, color: Color(0xFFA78BFA))),
+            ),
+          ],
+        ),
         actions: [
           IconButton(
             onPressed: () {
@@ -78,7 +120,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       ),
       body: Column(
         children: [
-          // Messages
           Expanded(
             child: messages.isEmpty
                 ? Center(
@@ -99,10 +140,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         const SizedBox(height: 16),
                         const Text("IM'U AI", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                         const SizedBox(height: 4),
-                        Text(
-                          'How can I help you today?',
-                          style: TextStyle(color: Colors.white.withAlpha(128)),
-                        ),
+                        Text('How can I help you today?', style: TextStyle(color: Colors.white.withAlpha(128))),
                       ],
                     ),
                   )
@@ -119,7 +157,22 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         padding: const EdgeInsets.only(bottom: 16),
                         child: Row(
                           mainAxisAlignment: isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            if (!isUser) ...[
+                              Container(
+                                width: 28,
+                                height: 28,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFA78BFA),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Center(
+                                  child: Text('IM', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 9)),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                            ],
                             Flexible(
                               child: Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -164,14 +217,45 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   ),
           ),
 
-          // Input
+          if (_pendingImage != null)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                children: [
+                  Stack(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.file(_pendingImage!, width: 60, height: 60, fit: BoxFit.cover),
+                      ),
+                      Positioned(
+                        top: -4,
+                        right: -4,
+                        child: GestureDetector(
+                          onTap: () => setState(() => _pendingImage = null),
+                          child: Container(
+                            width: 20,
+                            height: 20,
+                            decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                            child: const Icon(Icons.close, size: 12, color: Colors.white),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(width: 8),
+                  Text('Image attached', style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 12)),
+                ],
+              ),
+            ),
+
           Container(
             padding: const EdgeInsets.all(12),
             decoration: const BoxDecoration(
               border: Border(top: BorderSide(color: Color(0xFF27272A))),
             ),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
                 color: const Color(0xFF18181B),
                 borderRadius: BorderRadius.circular(16),
@@ -179,6 +263,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               ),
               child: Row(
                 children: [
+                  IconButton(
+                    onPressed: _showAttachmentSheet,
+                    icon: Icon(Icons.add, color: Colors.white.withAlpha(153), size: 22),
+                    constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                  ),
                   Expanded(
                     child: TextField(
                       controller: _inputController,
@@ -190,12 +279,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         hintText: "Message IM'U...",
                         hintStyle: TextStyle(color: Colors.white.withAlpha(128)),
                         border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
                       ),
                       style: const TextStyle(color: Colors.white, fontSize: 14),
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 4),
                   GestureDetector(
                     onTap: _sendMessage,
                     child: Container(
@@ -205,7 +294,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         color: Colors.white,
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.arrow_upward, color: Colors.black, size: 20),
+                      child: _isStreaming
+                          ? const Padding(
+                              padding: EdgeInsets.all(8),
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
+                            )
+                          : const Icon(Icons.arrow_upward, color: Colors.black, size: 20),
                     ),
                   ),
                 ],
@@ -213,6 +307,50 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showAttachmentSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF18181B),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.white.withAlpha(51),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 16),
+            ListTile(
+              leading: const Icon(Icons.camera_alt, color: Colors.white70),
+              title: const Text('Take Photo', style: TextStyle(color: Colors.white)),
+              onTap: () {
+                Navigator.pop(context);
+                _takePhoto();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library, color: Colors.white70),
+              title: const Text('Choose from Gallery', style: TextStyle(color: Colors.white)),
+              onTap: () {
+                Navigator.pop(context);
+                _pickImage();
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
       ),
     );
   }

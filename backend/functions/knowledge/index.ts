@@ -14,7 +14,7 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const openaiKey = Deno.env.get("OPENAI_API_KEY")!;
+    const groqApiKey = Deno.env.get("GROQ_API_KEY")!;
 
     const supabase = createClient(supabaseUrl, supabaseKey, {
       global: { headers: { Authorization: req.headers.get("Authorization")! } },
@@ -31,14 +31,15 @@ serve(async (req) => {
     const { action, text } = await req.json();
 
     if (action === "extract") {
-      const extractResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+      // Extract knowledge nodes using Groq
+      const extractResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${openaiKey}`,
+          "Authorization": `Bearer ${groqApiKey}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "gpt-4o-mini",
+          model: "llama-3.3-70b-versatile",
           messages: [
             {
               role: "system",
@@ -47,6 +48,7 @@ serve(async (req) => {
             { role: "user", content: text },
           ],
           temperature: 0.3,
+          max_tokens: 1024,
         }),
       });
 
@@ -55,26 +57,14 @@ serve(async (req) => {
 
       let nodes;
       try {
-        nodes = JSON.parse(nodesText);
+        // Try to parse, handle markdown code blocks
+        const cleaned = nodesText.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+        nodes = JSON.parse(cleaned);
       } catch {
         nodes = [];
       }
 
-      const embeddingResponse = await fetch("https://api.openai.com/v1/embeddings", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${openaiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "text-embedding-3-small",
-          input: text,
-        }),
-      });
-
-      const embeddingData = await embeddingResponse.json();
-      const embedding = embeddingData.data?.[0]?.embedding;
-
+      // Insert nodes (no embedding needed, Groq doesn't support embeddings)
       const insertedNodes = [];
       for (const node of nodes) {
         const { data: inserted, error } = await supabase
@@ -84,7 +74,6 @@ serve(async (req) => {
             label: node.label,
             node_type: node.node_type,
             content: node.content,
-            embedding,
             metadata: { extracted_from: "conversation", related: node.related_to },
           })
           .select()
@@ -95,6 +84,7 @@ serve(async (req) => {
         }
       }
 
+      // Create edges between related nodes
       for (const node of insertedNodes) {
         if (node.metadata?.related) {
           for (const relatedLabel of node.metadata.related) {
@@ -116,6 +106,7 @@ serve(async (req) => {
         }
       }
 
+      // Update stats
       const { count } = await supabase
         .from("knowledge_nodes")
         .select("*", { count: "exact", head: true })
@@ -140,22 +131,6 @@ serve(async (req) => {
         .limit(30);
 
       return new Response(JSON.stringify({ nodes: nodes || [] }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    if (action === "graph") {
-      const { data: nodes } = await supabase
-        .from("knowledge_nodes")
-        .select("*")
-        .eq("user_id", user.id);
-
-      const { data: edges } = await supabase
-        .from("knowledge_edges")
-        .select("*")
-        .in("source_id", (nodes || []).map((n: any) => n.id));
-
-      return new Response(JSON.stringify({ nodes: nodes || [], edges: edges || [] }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }

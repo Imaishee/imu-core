@@ -1,11 +1,22 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://cxiicvirllfdvcjwwcbj.supabase.co';
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+let _client: SupabaseClient | null = null;
 
-export const supabase = createClient(supabaseUrl, supabaseKey);
+function getClient(): SupabaseClient {
+  if (!_client) {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://cxiicvirllfdvcjwwcbj.supabase.co';
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+    _client = createClient(url, key);
+  }
+  return _client;
+}
+
+export function getSupabase() {
+  return getClient();
+}
 
 export async function getUsers() {
+  const supabase = getClient();
   const { data, error } = await supabase
     .from('profiles')
     .select('*')
@@ -14,6 +25,7 @@ export async function getUsers() {
 }
 
 export async function getUserStats() {
+  const supabase = getClient();
   const { data, error } = await supabase
     .from('user_stats')
     .select('*, profiles!inner(full_name, email)');
@@ -21,6 +33,7 @@ export async function getUserStats() {
 }
 
 export async function getConversations(userId?: string) {
+  const supabase = getClient();
   let query = supabase.from('conversations').select('*, profiles!inner(full_name, email)');
   if (userId) query = query.eq('user_id', userId);
   const { data, error } = await query.order('updated_at', { ascending: false }).limit(100);
@@ -28,6 +41,7 @@ export async function getConversations(userId?: string) {
 }
 
 export async function getNotifications() {
+  const supabase = getClient();
   const { data, error } = await supabase
     .from('notifications')
     .select('*')
@@ -37,6 +51,7 @@ export async function getNotifications() {
 }
 
 export async function sendNotification(title: string, body: string, target: string, targetUserId?: string) {
+  const supabase = getClient();
   const { data, error } = await supabase
     .from('notifications')
     .insert({ title, body, target, target_user_id: targetUserId, status: 'pending' })
@@ -46,6 +61,7 @@ export async function sendNotification(title: string, body: string, target: stri
 }
 
 export async function banUser(userId: string, banned: boolean) {
+  const supabase = getClient();
   const { error } = await supabase
     .from('profiles')
     .update({ is_banned: banned })
@@ -54,6 +70,7 @@ export async function banUser(userId: string, banned: boolean) {
 }
 
 export async function getActivityLog() {
+  const supabase = getClient();
   const { data, error } = await supabase
     .from('activity_log')
     .select('*, profiles!inner(full_name, email)')
@@ -63,6 +80,7 @@ export async function getActivityLog() {
 }
 
 export async function getSystemPrompts() {
+  const supabase = getClient();
   const { data, error } = await supabase
     .from('system_prompts')
     .select('*')
@@ -71,6 +89,7 @@ export async function getSystemPrompts() {
 }
 
 export async function updateSystemPrompt(id: string, prompt: string) {
+  const supabase = getClient();
   const { error } = await supabase
     .from('system_prompts')
     .update({ prompt, updated_at: new Date().toISOString() })
@@ -79,6 +98,7 @@ export async function updateSystemPrompt(id: string, prompt: string) {
 }
 
 export async function getDashboardStats() {
+  const supabase = getClient();
   const [users, conversations, messages] = await Promise.all([
     supabase.from('profiles').select('id', { count: 'exact', head: true }),
     supabase.from('conversations').select('id', { count: 'exact', head: true }),

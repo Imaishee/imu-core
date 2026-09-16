@@ -1,17 +1,10 @@
-import 'package:isar/isar.dart';
-
-part 'chat_message.g.dart';
-
-@collection
 class ChatMessage {
-  Id id = Isar.autoIncrement;
-
-  late String conversationId;
-  late String role; // 'user', 'assistant', 'system'
-  late String content;
+  String conversationId;
+  String role;
+  String content;
   int tokensUsed;
   String? model;
-  late DateTime createdAt;
+  DateTime createdAt;
 
   ChatMessage({
     required this.conversationId,

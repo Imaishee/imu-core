@@ -7,20 +7,37 @@ import '../services/local_storage.dart';
 final chatServiceProvider = Provider((ref) => ChatService());
 final localStorageProvider = Provider((ref) => LocalStorage());
 
-// Conversations state
-final conversationsProvider = StateNotifierProvider<ConversationsNotifier, List<Conversation>>((ref) {
-  return ConversationsNotifier(ref);
-});
+// Conversations
+final conversationsProvider = NotifierProvider<ConversationsNotifier, List<Conversation>>(
+  ConversationsNotifier.new,
+);
 
-class ConversationsNotifier extends StateNotifier<List<Conversation>> {
-  final Ref _ref;
+// Active conversation ID (using Notifier instead of StateProvider)
+final activeConversationProvider = NotifierProvider<ActiveConversationNotifier, String?>(
+  ActiveConversationNotifier.new,
+);
 
-  ConversationsNotifier(this._ref) : super([]) {
+class ActiveConversationNotifier extends Notifier<String?> {
+  @override
+  String? build() => null;
+
+  void set(String? id) => state = id;
+}
+
+// Messages per conversation (family via constructor)
+final messagesProvider = NotifierProvider.family<MessagesNotifier, List<ChatMessage>, String>(
+  MessagesNotifier.new,
+);
+
+class ConversationsNotifier extends Notifier<List<Conversation>> {
+  @override
+  List<Conversation> build() {
     _load();
+    return [];
   }
 
   Future<void> _load() async {
-    final local = await _ref.read(localStorageProvider).loadConversations();
+    final local = await ref.read(localStorageProvider).loadConversations();
     state = local;
   }
 
@@ -35,7 +52,19 @@ class ConversationsNotifier extends StateNotifier<List<Conversation>> {
   }
 
   void updateTitle(String remoteId, String title) {
-    state = state.map((c) => c.remoteId == remoteId ? (c..title = title)..updatedAt = DateTime.now() : c).toList();
+    state = [
+      for (final c in state)
+        if (c.remoteId == remoteId)
+          Conversation(
+            remoteId: c.remoteId,
+            title: title,
+            model: c.model,
+            createdAt: c.createdAt,
+            updatedAt: DateTime.now(),
+          )
+        else
+          c
+    ];
     _save();
   }
 
@@ -45,45 +74,30 @@ class ConversationsNotifier extends StateNotifier<List<Conversation>> {
   }
 
   void _save() {
-    _ref.read(localStorageProvider).saveConversations(state);
+    ref.read(localStorageProvider).saveConversations(state);
   }
 }
 
-// Messages state for active conversation
-final activeConversationProvider = StateProvider<String?>((ref) => null);
-
-final messagesProvider = StateNotifierProvider.family<MessagesNotifier, List<ChatMessage>, String>((ref, convoId) {
-  return MessagesNotifier(ref, convoId);
-});
-
-class MessagesNotifier extends StateNotifier<List<ChatMessage>> {
-  final Ref _ref;
+class MessagesNotifier extends Notifier<List<ChatMessage>> {
+  MessagesNotifier(this._convoId);
   final String _convoId;
 
-  MessagesNotifier(this._ref, this._convoId) : super([]) {
+  @override
+  List<ChatMessage> build() {
     _load();
+    return [];
   }
 
   Future<void> _load() async {
-    final local = await _ref.read(localStorageProvider).loadMessages(_convoId);
+    final local = await ref.read(localStorageProvider).loadMessages(_convoId);
     state = local;
   }
 
   Future<void> sendMessage(String content) async {
-    final userMsg = ChatMessage(
-      conversationId: _convoId,
-      role: 'user',
-      content: content,
-    );
+    final userMsg = ChatMessage(conversationId: _convoId, role: 'user', content: content);
     state = [...state, userMsg];
-    _save();
 
-    // Start streaming
-    final assistantMsg = ChatMessage(
-      conversationId: _convoId,
-      role: 'assistant',
-      content: '',
-    );
+    final assistantMsg = ChatMessage(conversationId: _convoId, role: 'assistant', content: '');
     state = [...state, assistantMsg];
 
     final apiMessages = state
@@ -92,28 +106,17 @@ class MessagesNotifier extends StateNotifier<List<ChatMessage>> {
         .toList();
 
     String fullContent = '';
-    await for (final chunk in _ref.read(chatServiceProvider).streamChat(
+    await for (final chunk in ref.read(chatServiceProvider).streamChat(
       messages: apiMessages.map((m) => {'role': m['role']!, 'content': m['content']!}).toList(),
       conversationId: _convoId,
     )) {
       fullContent += chunk;
       state = [
         ...state.sublist(0, state.length - 1),
-        ChatMessage(
-          conversationId: _convoId,
-          role: 'assistant',
-          content: fullContent,
-        ),
+        ChatMessage(conversationId: _convoId, role: 'assistant', content: fullContent),
       ];
     }
 
-    _save();
-  }
-
-  void _save() {
-    _ref.read(localStorageProvider).saveMessages(_convoId, state);
+    ref.read(localStorageProvider).saveMessages(_convoId, state);
   }
 }
-
-// Streaming state
-final isStreamingProvider = StateProvider<bool>((ref) => false);

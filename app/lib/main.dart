@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'screens/home_screen.dart';
+import 'screens/chat_screen.dart';
+import 'screens/settings_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -13,7 +15,7 @@ class ImuApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: "IM'U",
+      title: "IM'U 1.2",
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.dark,
@@ -23,7 +25,7 @@ class ImuApp extends StatelessWidget {
           secondary: Color(0xFFA78BFA),
           surface: Color(0xFF18181B),
         ),
-        cardTheme: CardTheme(
+        cardTheme: CardThemeData(
           color: const Color(0xFF18181B),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
@@ -38,6 +40,10 @@ class ImuApp extends StatelessWidget {
         useMaterial3: true,
       ),
       home: const HomeScreen(),
+      routes: {
+        '/chat': (context) => const ChatScreen(conversationId: ''),
+        '/settings': (context) => const SettingsScreen(),
+      },
     );
   }
 }

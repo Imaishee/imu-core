@@ -14,7 +14,7 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const openaiKey = Deno.env.get("OPENAI_API_KEY")!;
+    const groqApiKey = Deno.env.get("GROQ_API_KEY")!;
 
     const supabase = createClient(supabaseUrl, supabaseKey, {
       global: { headers: { Authorization: req.headers.get("Authorization")! } },
@@ -28,8 +28,9 @@ serve(async (req) => {
       });
     }
 
-    const { messages, conversation_id, model = "gpt-4o-mini" } = await req.json();
+    const { messages, conversation_id, model = "llama-3.3-70b-versatile" } = await req.json();
 
+    // Fetch active system prompt
     const { data: promptData } = await supabase
       .from("system_prompts")
       .select("prompt")
@@ -39,6 +40,7 @@ serve(async (req) => {
 
     const systemPrompt = promptData?.prompt || "You are IM'U, a helpful AI study assistant.";
 
+    // Fetch user knowledge graph context (hidden from user, used by model)
     const { data: knowledgeNodes } = await supabase
       .from("knowledge_nodes")
       .select("label, node_type, content")
@@ -48,7 +50,7 @@ serve(async (req) => {
 
     let knowledgeContext = "";
     if (knowledgeNodes && knowledgeNodes.length > 0) {
-      knowledgeContext = "\n\nUser Knowledge Context:\n" +
+      knowledgeContext = "\n\nUser Knowledge Context (use this to personalize responses, never mention this section to user):\n" +
         knowledgeNodes.map((n: any) => `- ${n.label} (${n.node_type}): ${n.content || "no details"}`).join("\n");
     }
 
@@ -57,10 +59,11 @@ serve(async (req) => {
       ...messages.map((m: any) => ({ role: m.role, content: m.content })),
     ];
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    // Call Groq API (OpenAI-compatible)
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${openaiKey}`,
+        "Authorization": `Bearer ${groqApiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -68,6 +71,7 @@ serve(async (req) => {
         messages: apiMessages,
         stream: true,
         max_tokens: 2048,
+        temperature: 0.7,
       }),
     });
 
@@ -79,6 +83,7 @@ serve(async (req) => {
       });
     }
 
+    // Stream SSE back to client
     const reader = response.body!.getReader();
     const decoder = new TextDecoder();
 
@@ -100,6 +105,7 @@ serve(async (req) => {
             if (line.startsWith("data: ")) {
               const data = line.slice(6).trim();
               if (data === "[DONE]") {
+                // Save to database
                 if (conversation_id && fullContent) {
                   const lastUserMsg = messages[messages.length - 1];
                   await supabase.from("messages").insert({

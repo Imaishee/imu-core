@@ -1,6 +1,5 @@
 -- Enable required extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE EXTENSION IF NOT EXISTS "vector";
 
 -- ============================================
 -- USERS TABLE (extends Supabase auth.users)
@@ -61,7 +60,6 @@ CREATE TABLE public.knowledge_nodes (
   label TEXT NOT NULL,
   node_type TEXT NOT NULL CHECK (node_type IN ('topic', 'concept', 'fact', 'question', 'answer', 'preference', 'habit', 'skill', 'entity')),
   content TEXT,
-  embedding vector(1536),
   metadata JSONB DEFAULT '{}'::jsonb,
   confidence FLOAT DEFAULT 1.0,
   created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -258,3 +256,24 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 CREATE OR REPLACE TRIGGER on_message_updated
   AFTER INSERT ON public.messages
   FOR EACH ROW EXECUTE FUNCTION public.update_conversation_timestamp();
+
+-- ============================================
+-- APP VERSIONS (Auto-update system)
+-- ============================================
+CREATE TABLE public.app_versions (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  version TEXT NOT NULL UNIQUE,
+  download_url TEXT NOT NULL,
+  release_notes TEXT DEFAULT '',
+  force_update BOOLEAN DEFAULT false,
+  file_size INTEGER DEFAULT 0,
+  checksum TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.app_versions ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Anyone can read versions" ON public.app_versions FOR SELECT USING (true);
+CREATE POLICY "Admins can manage versions" ON public.app_versions FOR ALL USING (
+  EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND preferences->>'role' = 'admin')
+);

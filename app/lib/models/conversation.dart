@@ -1,26 +1,17 @@
-import 'package:isar/isar.dart';
-
-part 'conversation.g.dart';
-
-@collection
 class Conversation {
-  Id id = Isar.autoIncrement;
-
-  @Index(unique: true)
-  late String remoteId;
-
-  late String title;
+  String remoteId;
+  String title;
   String? systemPrompt;
   String model;
   bool isArchived;
-  late DateTime createdAt;
-  late DateTime updatedAt;
+  DateTime createdAt;
+  DateTime updatedAt;
 
   Conversation({
     required this.remoteId,
     required this.title,
     this.systemPrompt,
-    this.model = 'gpt-4o-mini',
+    this.model = 'llama-3.3-70b-versatile',
     this.isArchived = false,
     DateTime? createdAt,
     DateTime? updatedAt,

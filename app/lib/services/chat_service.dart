@@ -8,7 +8,6 @@ class ChatService {
   final String _anonKey = AppConstants.supabaseAnonKey;
 
   Future<String> _getToken() async {
-    // In production, get from Supabase auth
     return _anonKey;
   }
 

@@ -9,6 +9,7 @@ const links = [
   { href: '/conversations', label: 'Conversations', icon: '💬' },
   { href: '/notifications', label: 'Notifications', icon: '🔔' },
   { href: '/prompts', label: 'Prompt Engine', icon: '🧠' },
+  { href: '/versions', label: 'App Versions', icon: '📱' },
   { href: '/activity', label: 'Activity Log', icon: '📋' },
 ];
 

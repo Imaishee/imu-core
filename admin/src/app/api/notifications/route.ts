@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getNotifications, sendNotification } from '@/lib/supabase';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   const { data, error } = await getNotifications();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

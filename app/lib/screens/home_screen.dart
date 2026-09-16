@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/chat_provider.dart';
+import '../constants/app_constants.dart';
 import 'chat_screen.dart';
 
 class HomeScreen extends ConsumerWidget {
@@ -14,7 +15,6 @@ class HomeScreen extends ConsumerWidget {
       body: SafeArea(
         child: Column(
           children: [
-            // Header
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: Row(
@@ -34,18 +34,79 @@ class HomeScreen extends ConsumerWidget {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      const Text("IM'U", style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text("IM'U", style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
+                          Text(AppConstants.appVersion, style: TextStyle(color: Colors.white.withAlpha(102), fontSize: 10)),
+                        ],
+                      ),
                     ],
                   ),
                   IconButton(
-                    onPressed: () {},
-                    icon: const Icon(Icons.settings_outlined, color: Colors.white54),
+                    onPressed: () => Navigator.pushNamed(context, '/settings'),
+                    icon: const Icon(Icons.settings_outlined, color: Colors.white54, size: 22),
                   ),
                 ],
               ),
             ),
 
-            // Hero
+            if (conversations.isNotEmpty) ...[
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Recent', style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 13, fontWeight: FontWeight.w500)),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                height: 100,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: conversations.length.clamp(0, 10),
+                  itemBuilder: (context, index) {
+                    final convo = conversations[index];
+                    return GestureDetector(
+                      onTap: () {
+                        ref.read(activeConversationProvider.notifier).set(convo.remoteId);
+                        Navigator.push(context, MaterialPageRoute(
+                          builder: (_) => ChatScreen(conversationId: convo.remoteId),
+                        ));
+                      },
+                      child: Container(
+                        width: 140,
+                        margin: const EdgeInsets.only(right: 12),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF18181B),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFF27272A)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(Icons.chat_bubble_outline, color: Colors.white38, size: 18),
+                            const Spacer(),
+                            Text(
+                              convo.title,
+                              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+
             Expanded(
               child: Center(
                 child: Padding(
@@ -79,13 +140,24 @@ class HomeScreen extends ConsumerWidget {
                         style: TextStyle(fontSize: 16, color: Colors.white.withAlpha(153)),
                         textAlign: TextAlign.center,
                       ),
+                      const SizedBox(height: 32),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        alignment: WrapAlignment.center,
+                        children: [
+                          _quickPrompt(context, ref, 'Write an essay', 'Help me write an essay about climate change'),
+                          _quickPrompt(context, ref, 'Solve a problem', 'Explain the water cycle in simple terms'),
+                          _quickPrompt(context, ref, 'Brainstorm ideas', 'Give me project ideas for my class'),
+                          _quickPrompt(context, ref, 'Study a topic', 'Teach me about plate tectonics'),
+                        ],
+                      ),
                     ],
                   ),
                 ),
               ),
             ),
 
-            // Bottom CTA
             Padding(
               padding: const EdgeInsets.all(16),
               child: SizedBox(
@@ -94,7 +166,7 @@ class HomeScreen extends ConsumerWidget {
                 child: ElevatedButton(
                   onPressed: () {
                     final convo = ref.read(conversationsProvider.notifier).createChat();
-                    ref.read(activeConversationProvider.notifier).state = convo.remoteId;
+                    ref.read(activeConversationProvider.notifier).set(convo.remoteId);
                     Navigator.push(context, MaterialPageRoute(
                       builder: (_) => ChatScreen(conversationId: convo.remoteId),
                     ));
@@ -117,6 +189,27 @@ class HomeScreen extends ConsumerWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _quickPrompt(BuildContext context, WidgetRef ref, String label, String prompt) {
+    return GestureDetector(
+      onTap: () {
+        final convo = ref.read(conversationsProvider.notifier).createChat();
+        ref.read(activeConversationProvider.notifier).set(convo.remoteId);
+        Navigator.push(context, MaterialPageRoute(
+          builder: (_) => ChatScreen(conversationId: convo.remoteId, initialPrompt: prompt),
+        ));
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: const Color(0xFF18181B),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: const Color(0xFF27272A)),
+        ),
+        child: Text(label, style: TextStyle(color: Colors.white.withAlpha(200), fontSize: 13)),
       ),
     );
   }

@@ -4,13 +4,12 @@ import '../models/conversation.dart';
 import '../models/chat_message.dart';
 
 class LocalStorage {
-  static const _conversationsKey = 'conversations';
-  static const _messagesKey = 'messages';
+  static const _conversationsKey = 'imu_conversations';
+  static const _messagesPrefix = 'imu_messages_';
 
   Future<void> saveConversations(List<Conversation> conversations) async {
     final prefs = await SharedPreferences.getInstance();
     final jsonList = conversations.map((c) => {
-      'id': c.id,
       'remoteId': c.remoteId,
       'title': c.title,
       'model': c.model,
@@ -30,18 +29,17 @@ class LocalStorage {
     return jsonList.map((j) => Conversation(
       remoteId: j['remoteId'],
       title: j['title'],
-      model: j['model'] ?? 'gpt-4o-mini',
+      model: j['model'] ?? 'llama-3.3-70b-versatile',
       isArchived: j['isArchived'] ?? false,
       createdAt: DateTime.parse(j['createdAt']),
       updatedAt: DateTime.parse(j['updatedAt']),
-    )..id = j['id']).toList();
+    )).toList();
   }
 
   Future<void> saveMessages(String conversationId, List<ChatMessage> messages) async {
     final prefs = await SharedPreferences.getInstance();
-    final key = '${_messagesKey}_$conversationId';
+    final key = '$_messagesPrefix$conversationId';
     final jsonList = messages.map((m) => {
-      'id': m.id,
       'conversationId': m.conversationId,
       'role': m.role,
       'content': m.content,
@@ -54,7 +52,7 @@ class LocalStorage {
 
   Future<List<ChatMessage>> loadMessages(String conversationId) async {
     final prefs = await SharedPreferences.getInstance();
-    final key = '${_messagesKey}_$conversationId';
+    final key = '$_messagesPrefix$conversationId';
     final data = prefs.getString(key);
     if (data == null) return [];
 
@@ -66,6 +64,6 @@ class LocalStorage {
       tokensUsed: j['tokensUsed'] ?? 0,
       model: j['model'],
       createdAt: DateTime.parse(j['createdAt']),
-    )..id = j['id']).toList();
+    )).toList();
   }
 }

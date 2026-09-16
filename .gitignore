@@ -38,3 +38,4 @@ info/
 
 # Supabase
 supabase/.temp/
+.pub-cache/

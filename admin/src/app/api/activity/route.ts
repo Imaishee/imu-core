@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getActivityLog } from '@/lib/supabase';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   const { data, error } = await getActivityLog();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
