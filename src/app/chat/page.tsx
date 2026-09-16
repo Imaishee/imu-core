@@ -231,7 +231,7 @@ export default function ChatPage() {
 
         {/* Sidebar */}
         {showSidebar && (
-          <div className="fixed inset-0 z-50 flex">
+          <div className="fixed inset-0 z-[60] flex">
             <div className="absolute inset-0 bg-black/30" onClick={() => setShowSidebar(false)} />
             <div className="relative w-72 bg-white h-full shadow-xl flex flex-col">
               <div className="p-4 border-b border-gray-100">
@@ -324,7 +324,7 @@ export default function ChatPage() {
         </div>
 
         {/* Input */}
-        <div className="sticky bottom-16 z-40 px-4 pb-2 bg-cream-100">
+        <div className="sticky bottom-0 z-40 px-4 pb-20 pt-2 bg-cream-100 border-t border-gray-100">
           <div className="bg-white rounded-2xl border border-gray-200 shadow-lg p-2 flex items-end gap-2">
             <textarea
               ref={inputRef}
