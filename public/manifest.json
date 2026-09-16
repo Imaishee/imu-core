@@ -1,0 +1,22 @@
+{
+  "name": "I'M U CORE",
+  "short_name": "IM'U",
+  "description": "Gamified study platform for B.A. Geography Honours and competitive exams",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F5F0EB",
+  "theme_color": "#7C3AED",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

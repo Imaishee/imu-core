@@ -40,7 +40,7 @@ export default function PrepPage() {
       <div className="px-4 pb-24 pt-2 space-y-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 font-display">Exam Prep</h1>
-          <p className="text-sm textgray-500">SSC, UPSC, UGC NET &amp; more</p>
+          <p className="text-sm text-gray-500">SSC, UPSC, UGC NET &amp; more</p>
         </div>
 
         {!selectedExam && (

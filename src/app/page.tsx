@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { AppShell } from '@/components/layout/AppShell';
+import { QuickGames } from '@/components/home/QuickGames';
 import Link from 'next/link';
 
 const GRADIENTS = ['gradient-violet', 'gradient-coral', 'gradient-mint', 'gradient-rose', 'gradient-amber', 'gradient-sky'];
@@ -57,7 +58,6 @@ export default function Home() {
     { href: '/timetable', label: 'Timetable', icon: '📅', color: 'bg-mint-50 text-mint-primary', gradient: 'gradient-mint' },
     { href: '/videos', label: 'Videos', icon: '🎬', color: 'bg-rose-50 text-rose-primary', gradient: 'gradient-rose' },
     { href: '/leaderboard', label: 'Ranks', icon: '🏆', color: 'bg-amber-50 text-amber-primary', gradient: 'gradient-amber' },
-    { href: '/games', label: 'Games', icon: '🎮', color: 'bg-sky-50 text-sky-primary', gradient: 'gradient-sky' },
   ];
 
   return (
@@ -167,6 +167,9 @@ export default function Home() {
             </div>
           </section>
         )}
+
+        {/* Quick Games */}
+        <QuickGames />
 
         {/* Quick Links Grid */}
         <section>

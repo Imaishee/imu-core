@@ -181,3 +181,69 @@ body {
     padding-bottom: calc(1rem + env(safe-area-inset-bottom));
   }
 }
+
+/* Touch-friendly interactive elements */
+@layer components {
+  .touch-target {
+    @apply min-h-[44px] min-w-[44px];
+  }
+
+  .touch-ripple {
+    @apply relative overflow-hidden;
+  }
+  .touch-ripple::after {
+    content: '';
+    @apply absolute inset-0 bg-white/20 opacity-0 transition-opacity duration-200;
+  }
+  .touch-ripple:active::after {
+    @apply opacity-100;
+  }
+
+  .mobile-card {
+    @apply bg-white rounded-2xl shadow-card transition-all duration-200 active:scale-[0.98] active:shadow-card-hover;
+  }
+
+  .mobile-list-item {
+    @apply flex items-center gap-3 p-3 rounded-xl transition-all duration-150 active:bg-gray-50;
+  }
+
+  .mobile-tab {
+    @apply px-4 py-2.5 rounded-xl text-sm font-semibold whitespace-nowrap transition-all duration-200;
+  }
+  .mobile-tab.active {
+    @apply bg-violet-primary text-white shadow-md;
+  }
+  .mobile-tab:not(.active) {
+    @apply bg-white/60 text-gray-500 active:bg-white;
+  }
+}
+
+/* Smooth scroll snapping for horizontal lists */
+.scroll-snap-x {
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+}
+.scroll-snap-x > * {
+  scroll-snap-align: start;
+}
+
+/* Page transition wrapper */
+.page-enter {
+  animation: pageEnter 0.25s ease-out;
+}
+@keyframes pageEnter {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+/* iOS-style momentum scrolling */
+.momentum-scroll {
+  -webkit-overflow-scrolling: touch;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+}
+
+/* Pull to refresh indicator */
+.ptr-indicator {
+  @apply flex justify-center py-4 transition-transform duration-200;
+}
