@@ -13,7 +13,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _darkMode = true;
   bool _notifications = true;
   bool _soundEnabled = true;
-  String _selectedModel = 'llama-3.3-70b-versatile';
+  String _selectedModel = 'openai/gpt-oss-20b';
   String _selectedLanguage = 'English';
 
   @override
@@ -28,7 +28,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _darkMode = prefs.getBool('dark_mode') ?? true;
       _notifications = prefs.getBool('notifications') ?? true;
       _soundEnabled = prefs.getBool('sound_enabled') ?? true;
-      _selectedModel = prefs.getString('model') ?? 'llama-3.3-70b-versatile';
+      _selectedModel = prefs.getString('model') ?? 'openai/gpt-oss-20b';
       _selectedLanguage = prefs.getString('language') ?? 'English';
     });
   }
@@ -100,9 +100,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 dropdownColor: const Color(0xFF27272A),
                 underline: const SizedBox(),
                 items: const [
-                  DropdownMenuItem(value: 'llama-3.3-70b-versatile', child: Text('Llama 3.3 70B', style: TextStyle(color: Colors.white, fontSize: 13))),
-                  DropdownMenuItem(value: 'llama-3.1-8b-instant', child: Text('Llama 3.1 8B (Fast)', style: TextStyle(color: Colors.white, fontSize: 13))),
-                  DropdownMenuItem(value: 'mixtral-8x7b-32768', child: Text('Mixtral 8x7B', style: TextStyle(color: Colors.white, fontSize: 13))),
+                  DropdownMenuItem(value: 'openai/gpt-oss-20b', child: Text('GPT-OSS 20B (Fast)', style: TextStyle(color: Colors.white, fontSize: 13))),
+                  DropdownMenuItem(value: 'openai/gpt-oss-120b', child: Text('GPT-OSS 120B (Smart)', style: TextStyle(color: Colors.white, fontSize: 13))),
+                  DropdownMenuItem(value: 'qwen/qwen3.8-27b', child: Text('Qwen 3.8 27B (Vision)', style: TextStyle(color: Colors.white, fontSize: 13))),
                 ],
                 onChanged: (v) {
                   if (v != null) {

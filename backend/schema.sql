@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS public.conversations (
   user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
   title TEXT DEFAULT 'New Chat',
   system_prompt TEXT,
-  model TEXT DEFAULT 'llama-3.3-70b-versatile',
+  model TEXT DEFAULT 'openai/gpt-oss-20b',
   is_archived BOOLEAN DEFAULT false,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()

@@ -1,16 +1,77 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'constants/app_constants.dart';
 import 'screens/home_screen.dart';
 import 'screens/chat_screen.dart';
 import 'screens/settings_screen.dart';
 
-void main() {
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp();
+}
+
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  await Firebase.initializeApp();
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+
+  await Supabase.initialize(
+    url: AppConstants.supabaseUrl,
+    publishableKey: AppConstants.supabaseAnonKey,
+  );
+
   runApp(const ProviderScope(child: ImuApp()));
 }
 
-class ImuApp extends StatelessWidget {
+class ImuApp extends StatefulWidget {
   const ImuApp({super.key});
+
+  @override
+  State<ImuApp> createState() => _ImuAppState();
+}
+
+class _ImuAppState extends State<ImuApp> {
+  @override
+  void initState() {
+    super.initState();
+    _setupFCM();
+  }
+
+  void _setupFCM() async {
+    final messaging = FirebaseMessaging.instance;
+
+    final settings = await messaging.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
+
+    if (settings.authorizationStatus == AuthorizationStatus.authorized) {
+      final token = await messaging.getToken();
+      if (token != null) {
+        debugPrint('FCM Token: ${token.substring(0, 20)}...');
+      }
+
+      messaging.onTokenRefresh.listen((newToken) {
+        debugPrint('FCM Token refreshed');
+      });
+    }
+
+    await messaging.subscribeToTopic(AppConstants.fcmTopic);
+
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      if (message.notification != null) {
+        debugPrint('Foreground notification: ${message.notification!.title}');
+      }
+    });
+
+    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+      debugPrint('Notification tapped: ${message.data}');
+    });
+  }
 
   @override
   Widget build(BuildContext context) {

@@ -5,18 +5,20 @@ class AppConstants {
 
   // Supabase
   static const String supabaseUrl = 'https://cxiicvirllfdvcjwwcbj.supabase.co';
-  static const String supabaseAnonKey = String.fromEnvironment(
-    'SUPABASE_ANON_KEY',
-    defaultValue: '',
-  );
+  static const String supabaseAnonKey = 'sb_publishable_ejpB_tpHU9pgI3OrslbtDQ_qxbKrDN9';
 
-  // Groq API (used via Edge Functions, never exposed directly)
-  static const String defaultModel = 'llama-3.3-70b-versatile';
+  // Groq Models (via Edge Functions, key never exposed to client)
+  static const String defaultModel = 'openai/gpt-oss-20b';
+  static const String reasoningModel = 'openai/gpt-oss-120b';
+  static const String visionModel = 'qwen/qwen3.8-27b';
 
   // API Endpoints
   static const String chatEndpoint = '/functions/v1/chat';
   static const String knowledgeEndpoint = '/functions/v1/knowledge';
   static const String checkUpdateEndpoint = '/functions/v1/check-update';
+
+  // Firebase
+  static const String fcmTopic = 'all_users';
 
   // UI
   static const double maxContentWidth = 768;

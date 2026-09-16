@@ -39,3 +39,6 @@ info/
 # Supabase
 supabase/.temp/
 .pub-cache/
+
+# Credentials (NEVER commit)
+backend/secrets/

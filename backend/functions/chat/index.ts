@@ -28,7 +28,7 @@ serve(async (req) => {
       });
     }
 
-    const { messages, conversation_id, model = "llama-3.3-70b-versatile" } = await req.json();
+    const { messages, conversation_id, model = "openai/gpt-oss-20b" } = await req.json();
 
     // Fetch active system prompt
     const { data: promptData } = await supabase
