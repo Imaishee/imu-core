@@ -10,8 +10,26 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "I'M U CORE — Study Platform",
-  description: 'Gamified study platform for B.A. Geography Honours and competitive exams',
+  title: {
+    default: "I'M U CORE — Gamified Study Platform",
+    template: "%s | I'M U CORE",
+  },
+  description: 'Duolingo-inspired gamified study platform for B.A. Geography Honours and competitive exams. Learn with flashcards, quizzes, boss battles, and more.',
+  keywords: ['study app', 'geography', 'honours', 'competitive exams', 'gamified learning', 'flashcards', 'quiz'],
+  authors: [{ name: "I'M U" }],
+  openGraph: {
+    type: 'website',
+    locale: 'en_US',
+    url: 'https://imu-core.vercel.app',
+    siteName: "I'M U CORE",
+    title: "I'M U CORE — Gamified Study Platform",
+    description: 'Duolingo-inspired gamified study platform for B.A. Geography Honours and competitive exams.',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: "I'M U CORE — Gamified Study Platform",
+    description: 'Duolingo-inspired gamified study platform for B.A. Geography Honours and competitive exams.',
+  },
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
