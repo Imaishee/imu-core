@@ -15,13 +15,23 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await Firebase.initializeApp();
-  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  // Init Firebase (crash-safe)
+  try {
+    await Firebase.initializeApp();
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  } catch (e) {
+    debugPrint('Firebase init failed: $e');
+  }
 
-  await Supabase.initialize(
-    url: AppConstants.supabaseUrl,
-    publishableKey: AppConstants.supabaseAnonKey,
-  );
+  // Init Supabase (crash-safe)
+  try {
+    await Supabase.initialize(
+      url: AppConstants.supabaseUrl,
+      publishableKey: AppConstants.supabaseAnonKey,
+    );
+  } catch (e) {
+    debugPrint('Supabase init failed: $e');
+  }
 
   runApp(const ProviderScope(child: ImuApp()));
 }
@@ -41,36 +51,32 @@ class _ImuAppState extends State<ImuApp> {
   }
 
   void _setupFCM() async {
-    final messaging = FirebaseMessaging.instance;
+    try {
+      final messaging = FirebaseMessaging.instance;
 
-    final settings = await messaging.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-    );
+      final settings = await messaging.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
 
-    if (settings.authorizationStatus == AuthorizationStatus.authorized) {
-      final token = await messaging.getToken();
-      if (token != null) {
-        debugPrint('FCM Token: ${token.substring(0, 20)}...');
+      if (settings.authorizationStatus == AuthorizationStatus.authorized) {
+        final token = await messaging.getToken();
+        if (token != null) {
+          debugPrint('FCM Token registered');
+        }
+
+        messaging.onTokenRefresh.listen((_) {});
       }
 
-      messaging.onTokenRefresh.listen((newToken) {
-        debugPrint('FCM Token refreshed');
-      });
+      await messaging.subscribeToTopic(AppConstants.fcmTopic);
+
+      FirebaseMessaging.onMessage.listen((RemoteMessage message) {});
+
+      FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {});
+    } catch (e) {
+      debugPrint('FCM setup skipped: $e');
     }
-
-    await messaging.subscribeToTopic(AppConstants.fcmTopic);
-
-    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      if (message.notification != null) {
-        debugPrint('Foreground notification: ${message.notification!.title}');
-      }
-    });
-
-    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-      debugPrint('Notification tapped: ${message.data}');
-    });
   }
 
   @override
