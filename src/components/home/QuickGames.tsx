@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Layers, Brain, Timer, Link, Zap, Swords, Trophy } from 'lucide-react';
+import { Layers, Brain, Timer, Link, Zap, Swords, Trophy, TrendingUp, Zap as ZapIcon, Map } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 
 const quickGames = [
@@ -12,6 +12,9 @@ const quickGames = [
   { title: 'Speed Round', icon: Zap, color: '#F472B6', unlocked: false },
   { title: 'Boss Battle', icon: Swords, color: '#EF4444', unlocked: false },
   { title: 'Marathon', icon: Trophy, color: '#2ABFBF', unlocked: false },
+  { title: 'Strategy Quiz', icon: TrendingUp, color: '#8B5CF6', unlocked: false },
+  { title: 'Reflex Challenge', icon: ZapIcon, color: '#06B6D4', unlocked: false },
+  { title: 'Knowledge Explorer', icon: Map, color: '#10B981', unlocked: false },
 ];
 
 export function QuickGames() {

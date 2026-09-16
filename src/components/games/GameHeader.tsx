@@ -9,6 +9,7 @@ interface GameHeaderProps {
   timer?: number;
   score: number;
   xpEarned: number;
+  enhanced?: boolean;
 }
 
 export default function GameHeader({
@@ -16,6 +17,7 @@ export default function GameHeader({
   timer,
   score,
   xpEarned,
+  enhanced = false,
 }: GameHeaderProps) {
   const router = useRouter();
 
@@ -23,38 +25,48 @@ export default function GameHeader({
     <motion.div
       initial={{ y: -20, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
-      className="flex items-center justify-between w-full p-4 bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg"
+      className={`flex items-center justify-between w-full p-6 bg-white/85 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 ${
+        enhanced
+          ? "bg-gradient-to-tl from-indigo-50 to-purple-50"
+          : ""
+      }`}
     >
       <button
         onClick={() => router.push("/games")}
-        className="flex items-center gap-2 text-gray-600 hover:text-gray-800 transition-colors"
+        className={`flex items-center gap-3 p-3 bg-white/70 backdrop-blur rounded-xl hover:bg-white/80 transition-all duration-200 ${
+          enhanced ? "shadow-lg" : ""
+        }`}
       >
-        <ArrowLeft className="w-5 h-5" />
-        <span className="text-sm font-medium">Back</span>
+        <ArrowLeft className="w-6 h-6 text-gray-600 hover:text-gray-800" />
+        <span className="text-base font-medium text-gray-700 hover:text-gray-900">Back to Games</span>
       </button>
 
-      <h1 className="text-lg font-bold text-gray-800">{title}</h1>
+      <h1 className={`text-xl font-bold text-gray-800 ${
+        enhanced ? "bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent" : ""
+      }`}>
+        {title}
+      </h1>
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-5">
         {timer !== undefined && (
           <motion.div
-            className="flex items-center gap-1 text-orange-500"
-            animate={timer <= 10 ? { scale: [1, 1.1, 1] } : {}}
+            className="flex items-center gap-2 p-3 bg-white/70 backdrop-blur rounded-xl border border-white/20"
+            animate={timer <= 10 ? { scale: [1, 1.05, 1] } : {}}
             transition={{ duration: 0.5, repeat: timer <= 10 ? Infinity : 0 }}
           >
-            <Timer className="w-5 h-5" />
-            <span className="font-bold">{timer}s</span>
+            <Timer className="w-6 h-6 text-orange-500" />
+            <span className="text-lg font-bold text-orange-600">{timer}s</span>
           </motion.div>
         )}
 
-        <div className="flex items-center gap-1 text-blue-500">
-          <Star className="w-5 h-5" />
-          <span className="font-bold">{score}</span>
+        <div className="flex items-center gap-2 p-3 bg-white/70 backdrop-blur rounded-xl border border-white/20">
+          <Star className="w-6 h-6 text-blue-500" />
+          <span className="text-lg font-bold text-blue-600">{score}</span>
         </div>
 
-        <div className="flex items-center gap-1 text-purple-500">
-          <Zap className="w-5 h-5" />
-          <span className="font-bold">+{xpEarned}</span>
+        <div className="flex items-center gap-2 p-3 bg-white/70 backdrop-blur rounded-xl border border-white/20">
+          <Zap className="w-6 h-6 text-purple-500" />
+          <span className="text-lg font-bold text-purple-600">+{xpEarned}</span>
         </div>
       </div>
     </motion.div>

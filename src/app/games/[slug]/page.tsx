@@ -8,6 +8,9 @@ import WordSearchGame from "../../../components/games/WordSearchGame";
 import PuzzleGame from "../../../components/games/PuzzleGame";
 import SpeedRoundGame from "../../../components/games/SpeedRoundGame";
 import BossBattleGame from "../../../components/games/BossBattleGame";
+import ReflexChallengeGame from "../../../components/games/ReflexChallengeGame";
+import StrategyQuizGame from "../../../components/games/StrategyQuizGame";
+import KnowledgeExplorerGame from "../../../components/games/KnowledgeExplorerGame";
 
 const gameComponents: Record<string, React.ComponentType> = {
   flashcard: FlashcardGame,
@@ -17,6 +20,9 @@ const gameComponents: Record<string, React.ComponentType> = {
   puzzle: PuzzleGame,
   speedround: SpeedRoundGame,
   bossbattle: BossBattleGame,
+  reflexchallenge: ReflexChallengeGame,
+  strategyquiz: StrategyQuizGame,
+  knowledgeexplorer: KnowledgeExplorerGame,
 };
 
 export default function GamePage() {
