@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../providers/chat_provider.dart';
 import '../constants/app_constants.dart';
 import 'chat_screen.dart';
@@ -115,7 +116,9 @@ class _HomeBodyState extends State<_HomeBody> {
             TextButton(
               onPressed: () {
                 Navigator.pop(ctx);
-                // Would open update URL
+                if (widget.updateUrl != null) {
+                  launchUrl(Uri.parse(widget.updateUrl!), mode: LaunchMode.externalApplication);
+                }
               },
               child: Text('Update', style: TextStyle(color: _accent)),
             ),
