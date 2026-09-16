@@ -28,13 +28,13 @@ export async function getUserStats() {
   const supabase = getClient();
   const { data, error } = await supabase
     .from('user_stats')
-    .select('*, profiles!inner(full_name, email)');
+    .select('*, profiles!inner(name)');
   return { data: data || [], error };
 }
 
 export async function getConversations(userId?: string) {
   const supabase = getClient();
-  let query = supabase.from('conversations').select('*, profiles!inner(full_name, email)');
+  let query = supabase.from('conversations').select('*, profiles!inner(name)');
   if (userId) query = query.eq('user_id', userId);
   const { data, error } = await query.order('updated_at', { ascending: false }).limit(100);
   return { data: data || [], error };
@@ -50,16 +50,6 @@ export async function getNotifications() {
   return { data: data || [], error };
 }
 
-export async function sendNotification(title: string, body: string, target: string, targetUserId?: string) {
-  const supabase = getClient();
-  const { data, error } = await supabase
-    .from('notifications')
-    .insert({ title, body, target, target_user_id: targetUserId, status: 'pending' })
-    .select()
-    .single();
-  return { data, error };
-}
-
 export async function banUser(userId: string, banned: boolean) {
   const supabase = getClient();
   const { error } = await supabase
@@ -73,7 +63,7 @@ export async function getActivityLog() {
   const supabase = getClient();
   const { data, error } = await supabase
     .from('activity_log')
-    .select('*, profiles!inner(full_name, email)')
+    .select('*, profiles!inner(name)')
     .order('created_at', { ascending: false })
     .limit(100);
   return { data: data || [], error };

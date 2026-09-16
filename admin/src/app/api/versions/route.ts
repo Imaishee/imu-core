@@ -27,5 +27,13 @@ export async function POST(request: Request) {
     .select()
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  await supabase.from('activity_log').insert({
+    action: 'version_published',
+    target_type: 'app_version',
+    target_id: data?.id,
+    metadata: { version: body.version },
+  });
+
   return NextResponse.json({ version: data });
 }

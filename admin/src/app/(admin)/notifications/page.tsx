@@ -86,7 +86,7 @@ export default function NotificationsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-white">{n.title}</p>
-                  <p className="text-xs text-zinc-500 mt-0.5">{n.body}</p>
+                  <p className="text-xs text-zinc-500 mt-0.5">{n.message}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className={`px-2 py-0.5 rounded text-xs ${

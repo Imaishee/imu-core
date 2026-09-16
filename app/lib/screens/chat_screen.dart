@@ -1,8 +1,10 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/chat_provider.dart';
 import '../constants/app_constants.dart';
@@ -205,57 +207,62 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                               const SizedBox(width: 8),
                             ],
                             Flexible(
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                decoration: BoxDecoration(
-                                  color: isUser ? _userBubble : Colors.transparent,
-                                  borderRadius: BorderRadius.only(
-                                    topLeft: const Radius.circular(16),
-                                    topRight: const Radius.circular(16),
-                                    bottomLeft: Radius.circular(isUser ? 16 : 4),
-                                    bottomRight: Radius.circular(isUser ? 4 : 16),
+                              child: GestureDetector(
+                                onLongPress: !isUser && msg.content.isNotEmpty
+                                    ? () => _showMessageActions(msg.content)
+                                    : null,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                  decoration: BoxDecoration(
+                                    color: isUser ? _userBubble : Colors.transparent,
+                                    borderRadius: BorderRadius.only(
+                                      topLeft: const Radius.circular(16),
+                                      topRight: const Radius.circular(16),
+                                      bottomLeft: Radius.circular(isUser ? 16 : 4),
+                                      bottomRight: Radius.circular(isUser ? 4 : 16),
+                                    ),
                                   ),
-                                ),
-                                child: isLast && msg.content.isEmpty
-                                    ? _buildTypingIndicator()
-                                    : Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          if (msg.fileUrl != null && msg.fileUrl!.isNotEmpty)
-                                            _buildAttachment(msg.fileType, msg.fileUrl!),
-                                          if (msg.fileUrl != null && msg.fileUrl!.isNotEmpty && msg.content.isNotEmpty)
-                                            const SizedBox(height: 8),
-                                          isUser
-                                              ? Text(msg.content, style: TextStyle(color: _textPrimary, fontSize: 14))
-                                              : MarkdownBody(
-                                                  data: msg.content,
-                                                  styleSheet: MarkdownStyleSheet(
-                                                    p: TextStyle(color: _textPrimary, fontSize: 14),
-                                                    code: TextStyle(
-                                                      backgroundColor: _borderColor,
-                                                      color: _accent,
-                                                      fontSize: 13,
+                                  child: isLast && msg.content.isEmpty
+                                      ? _buildTypingIndicator()
+                                      : Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            if (msg.fileUrl != null && msg.fileUrl!.isNotEmpty)
+                                              _buildAttachment(msg.fileType, msg.fileUrl!),
+                                            if (msg.fileUrl != null && msg.fileUrl!.isNotEmpty && msg.content.isNotEmpty)
+                                              const SizedBox(height: 8),
+                                            isUser
+                                                ? Text(msg.content, style: TextStyle(color: _textPrimary, fontSize: 14))
+                                                : MarkdownBody(
+                                                    data: msg.content,
+                                                    styleSheet: MarkdownStyleSheet(
+                                                      p: TextStyle(color: _textPrimary, fontSize: 14),
+                                                      code: TextStyle(
+                                                        backgroundColor: _borderColor,
+                                                        color: _accent,
+                                                        fontSize: 13,
+                                                      ),
+                                                      codeblockDecoration: BoxDecoration(
+                                                        color: _cardBg,
+                                                        borderRadius: BorderRadius.circular(8),
+                                                      ),
+                                                      h1: TextStyle(color: _textPrimary, fontSize: 20, fontWeight: FontWeight.bold),
+                                                      h2: TextStyle(color: _textPrimary, fontSize: 18, fontWeight: FontWeight.bold),
+                                                      h3: TextStyle(color: _textPrimary, fontSize: 16, fontWeight: FontWeight.bold),
+                                                      listBullet: TextStyle(color: _textSecondary),
                                                     ),
-                                                    codeblockDecoration: BoxDecoration(
-                                                      color: _cardBg,
-                                                      borderRadius: BorderRadius.circular(8),
-                                                    ),
-                                                    h1: TextStyle(color: _textPrimary, fontSize: 20, fontWeight: FontWeight.bold),
-                                                    h2: TextStyle(color: _textPrimary, fontSize: 18, fontWeight: FontWeight.bold),
-                                                    h3: TextStyle(color: _textPrimary, fontSize: 16, fontWeight: FontWeight.bold),
-                                                    listBullet: TextStyle(color: _textSecondary),
                                                   ),
-                                                ),
-                                        ],
-                                      ),
+                                          ],
+                                        ),
+                                ),
                               ),
                             ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-          ),
+                           ],
+                         ),
+                       );
+                     },
+                   ),
+           ),
 
           if (_pendingImage != null)
             Container(
@@ -339,6 +346,44 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showMessageActions(String content) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: _cardBg,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(width: 36, height: 4, decoration: BoxDecoration(color: _textSecondary.withAlpha(51), borderRadius: BorderRadius.circular(2))),
+            const SizedBox(height: 16),
+            ListTile(
+              leading: Icon(Icons.copy, color: _textSecondary),
+              title: Text('Copy to Clipboard', style: TextStyle(color: _textPrimary)),
+              onTap: () {
+                Navigator.pop(ctx);
+                Clipboard.setData(ClipboardData(text: content));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: const Text('Copied!'), backgroundColor: _accent, behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+                );
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.share, color: _textSecondary),
+              title: Text('Share', style: TextStyle(color: _textPrimary)),
+              onTap: () {
+                Navigator.pop(ctx);
+                SharePlus.instance.share(ShareParams(text: content));
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
       ),
     );
   }

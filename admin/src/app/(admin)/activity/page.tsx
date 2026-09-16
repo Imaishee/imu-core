@@ -31,7 +31,7 @@ export default function ActivityPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-white">
-                      <span className="font-medium">{log.profiles?.full_name || log.profiles?.email || 'System'}</span>
+                      <span className="font-medium">{log.profiles?.name || 'System'}</span>
                       {' '}
                       <span className="text-zinc-400">{log.action}</span>
                     </p>

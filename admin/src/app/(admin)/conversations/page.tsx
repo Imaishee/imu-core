@@ -37,7 +37,7 @@ export default function ConversationsPage() {
             <tbody>
               {conversations.map((convo) => (
                 <tr key={convo.id} className="border-b border-[#27272a] hover:bg-[#27272a] transition-colors">
-                  <td className="px-4 py-3 text-sm text-zinc-400">{convo.profiles?.email || 'Unknown'}</td>
+                  <td className="px-4 py-3 text-sm text-zinc-400">{convo.profiles?.name || 'Unknown'}</td>
                   <td className="px-4 py-3 text-sm text-white">{convo.title}</td>
                   <td className="px-4 py-3 text-sm text-zinc-400">{convo.model}</td>
                   <td className="px-4 py-3 text-sm text-zinc-400">

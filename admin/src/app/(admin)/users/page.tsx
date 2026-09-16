@@ -38,7 +38,7 @@ export default function UsersPage() {
             <thead>
               <tr className="border-b border-[#27272a]">
                 <th className="text-left px-4 py-3 text-sm text-zinc-400 font-medium">User</th>
-                <th className="text-left px-4 py-3 text-sm text-zinc-400 font-medium">Email</th>
+                <th className="text-left px-4 py-3 text-sm text-zinc-400 font-medium">User ID</th>
                 <th className="text-left px-4 py-3 text-sm text-zinc-400 font-medium">Joined</th>
                 <th className="text-left px-4 py-3 text-sm text-zinc-400 font-medium">Status</th>
                 <th className="text-left px-4 py-3 text-sm text-zinc-400 font-medium">Actions</th>
@@ -50,12 +50,12 @@ export default function UsersPage() {
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-full bg-[#a78bfa] flex items-center justify-center text-sm font-bold text-white">
-                        {(user.full_name || 'U')[0].toUpperCase()}
+                        {(user.name || 'U')[0].toUpperCase()}
                       </div>
-                      <span className="text-sm text-white">{user.full_name || 'Anonymous'}</span>
+                      <span className="text-sm text-white">{user.name || 'Anonymous'}</span>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-sm text-zinc-400">{user.email}</td>
+                  <td className="px-4 py-3 text-sm text-zinc-400">{user.id?.slice(0,8)}...</td>
                   <td className="px-4 py-3 text-sm text-zinc-400">
                     {new Date(user.created_at).toLocaleDateString()}
                   </td>
