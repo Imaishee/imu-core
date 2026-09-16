@@ -1,17 +1,65 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../providers/chat_provider.dart';
 import '../constants/app_constants.dart';
 import 'chat_screen.dart';
+import 'settings_screen.dart';
+import 'alarms_screen.dart';
 
 class HomeScreen extends ConsumerWidget {
-  const HomeScreen({super.key});
+  final VoidCallback? onToggleTheme;
+  const HomeScreen({super.key, this.onToggleTheme});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final conversations = ref.watch(conversationsProvider);
 
+    return _HomeBody(conversations: conversations, ref: ref, onToggleTheme: onToggleTheme);
+  }
+}
+
+class _HomeBody extends StatefulWidget {
+  final List conversations;
+  final WidgetRef ref;
+  final VoidCallback? onToggleTheme;
+  const _HomeBody({required this.conversations, required this.ref, this.onToggleTheme});
+
+  @override
+  State<_HomeBody> createState() => _HomeBodyState();
+}
+
+class _HomeBodyState extends State<_HomeBody> {
+  bool _isDark = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTheme();
+  }
+
+  Future<void> _loadTheme() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) setState(() => _isDark = prefs.getBool('dark_mode') ?? true);
+  }
+
+  Color get _bg => _isDark ? const Color(0xFF09090B) : const Color(0xFFF8F9FA);
+  Color get _cardBg => _isDark ? const Color(0xFF18181B) : Colors.white;
+  Color get _borderColor => _isDark ? const Color(0xFF27272A) : const Color(0xFFE5E7EB);
+  Color get _textPrimary => _isDark ? Colors.white : const Color(0xFF18181B);
+  Color get _textSecondary => _isDark ? Colors.white54 : const Color(0xFF71717A);
+  Color get _accent => _isDark ? const Color(0xFFA78BFA) : const Color(0xFF7C3AED);
+  Color get _logoBg => _isDark ? Colors.white : Colors.black;
+  Color get _logoText => _isDark ? Colors.black : Colors.white;
+
+  @override
+  Widget build(BuildContext context) {
+    final ref = widget.ref;
+    final conversations = widget.conversations;
+
     return Scaffold(
+      backgroundColor: _bg,
       body: SafeArea(
         child: Column(
           children: [
@@ -23,29 +71,35 @@ class HomeScreen extends ConsumerWidget {
                   Row(
                     children: [
                       Container(
-                        width: 32,
-                        height: 32,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Center(
-                          child: Text('IM', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 12)),
-                        ),
+                        width: 32, height: 32,
+                        decoration: BoxDecoration(color: _logoBg, borderRadius: BorderRadius.circular(8)),
+                        child: Center(child: Text('IM', style: TextStyle(color: _logoText, fontWeight: FontWeight.bold, fontSize: 12))),
                       ),
                       const SizedBox(width: 8),
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text("IM'U", style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
-                          Text(AppConstants.appVersion, style: TextStyle(color: Colors.white.withAlpha(102), fontSize: 10)),
+                          Text("IM'U", style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16, color: _textPrimary)),
+                          Text(AppConstants.appVersion, style: TextStyle(color: _textSecondary, fontSize: 10)),
                         ],
                       ),
                     ],
                   ),
-                  IconButton(
-                    onPressed: () => Navigator.pushNamed(context, '/settings'),
-                    icon: const Icon(Icons.settings_outlined, color: Colors.white54, size: 22),
+                  Row(
+                    children: [
+                      IconButton(
+                        onPressed: () => Navigator.push(context, MaterialPageRoute(
+                          builder: (_) => const AlarmsScreen(),
+                        )).then((_) => _loadTheme()),
+                        icon: Icon(Icons.alarm_outlined, color: _textSecondary, size: 22),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.push(context, MaterialPageRoute(
+                          builder: (_) => SettingsScreen(onToggleTheme: widget.onToggleTheme),
+                        )).then((_) => _loadTheme()),
+                        icon: Icon(Icons.settings_outlined, color: _textSecondary, size: 22),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -57,7 +111,7 @@ class HomeScreen extends ConsumerWidget {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('Recent', style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 13, fontWeight: FontWeight.w500)),
+                    Text('Recent', style: TextStyle(color: _textSecondary, fontSize: 13, fontWeight: FontWeight.w500)),
                   ],
                 ),
               ),
@@ -82,18 +136,18 @@ class HomeScreen extends ConsumerWidget {
                         margin: const EdgeInsets.only(right: 12),
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF18181B),
+                          color: _cardBg,
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: const Color(0xFF27272A)),
+                          border: Border.all(color: _borderColor),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Icon(Icons.chat_bubble_outline, color: Colors.white38, size: 18),
+                            Icon(Icons.chat_bubble_outline, color: _textSecondary, size: 18),
                             const Spacer(),
                             Text(
                               convo.title,
-                              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500),
+                              style: TextStyle(color: _textPrimary, fontSize: 12, fontWeight: FontWeight.w500),
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -115,29 +169,24 @@ class HomeScreen extends ConsumerWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Container(
-                        width: 80,
-                        height: 80,
+                        width: 80, height: 80,
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: _logoBg,
                           borderRadius: BorderRadius.circular(20),
-                          boxShadow: [
-                            BoxShadow(color: Colors.white.withAlpha(25), blurRadius: 40),
-                          ],
+                          boxShadow: [BoxShadow(color: (_isDark ? Colors.white : Colors.black).withAlpha(25), blurRadius: 40)],
                         ),
-                        child: const Center(
-                          child: Text('IM', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 24)),
-                        ),
+                        child: Center(child: Text('IM', style: TextStyle(color: _logoText, fontWeight: FontWeight.bold, fontSize: 24))),
                       ),
                       const SizedBox(height: 32),
-                      const Text(
+                      Text(
                         'What can I help with?',
-                        style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white),
+                        style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: _textPrimary),
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 8),
                       Text(
                         'Ask me anything — studies, research, writing, code.',
-                        style: TextStyle(fontSize: 16, color: Colors.white.withAlpha(153)),
+                        style: TextStyle(fontSize: 16, color: _textSecondary),
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 32),
@@ -172,8 +221,8 @@ class HomeScreen extends ConsumerWidget {
                     ));
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: Colors.black,
+                    backgroundColor: _logoBg,
+                    foregroundColor: _logoText,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
                   ),
                   child: const Row(
@@ -205,11 +254,11 @@ class HomeScreen extends ConsumerWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: const Color(0xFF18181B),
+          color: _cardBg,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: const Color(0xFF27272A)),
+          border: Border.all(color: _borderColor),
         ),
-        child: Text(label, style: TextStyle(color: Colors.white.withAlpha(200), fontSize: 13)),
+        child: Text(label, style: TextStyle(color: _textPrimary, fontSize: 13)),
       ),
     );
   }

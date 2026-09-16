@@ -1,11 +1,11 @@
 class AppConstants {
   static const String appName = "IM'U";
-  static const String appVersion = "1.2.0";
+  static const String appVersion = "1.3.0";
   static const String appTagline = "AI Study Companion";
 
   // Supabase
   static const String supabaseUrl = 'https://cxiicvirllfdvcjwwcbj.supabase.co';
-  static const String supabaseAnonKey = 'sb_publishable_ejpB_tpHU9pgI3OrslbtDQ_qxbKrDN9';
+  static const String supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN4aWljdmlybGxmZHZjand3Y2JqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk0NTI2MjMsImV4cCI6MjEwNTAyODYyM30.XaNaSnX4S8_xqiOg1KvfhUzEcufspv0INMpfowLEcOY';
 
   // Groq Models (via Edge Functions, key never exposed to client)
   static const String defaultModel = 'openai/gpt-oss-20b';

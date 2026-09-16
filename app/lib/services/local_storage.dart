@@ -29,7 +29,7 @@ class LocalStorage {
     return jsonList.map((j) => Conversation(
       remoteId: j['remoteId'],
       title: j['title'],
-      model: j['model'] ?? 'llama-3.3-70b-versatile',
+      model: j['model'] ?? 'openai/gpt-oss-20b',
       isArchived: j['isArchived'] ?? false,
       createdAt: DateTime.parse(j['createdAt']),
       updatedAt: DateTime.parse(j['updatedAt']),
@@ -39,14 +39,7 @@ class LocalStorage {
   Future<void> saveMessages(String conversationId, List<ChatMessage> messages) async {
     final prefs = await SharedPreferences.getInstance();
     final key = '$_messagesPrefix$conversationId';
-    final jsonList = messages.map((m) => {
-      'conversationId': m.conversationId,
-      'role': m.role,
-      'content': m.content,
-      'tokensUsed': m.tokensUsed,
-      'model': m.model,
-      'createdAt': m.createdAt.toIso8601String(),
-    }).toList();
+    final jsonList = messages.map((m) => m.toJson()).toList();
     await prefs.setString(key, jsonEncode(jsonList));
   }
 
@@ -57,13 +50,6 @@ class LocalStorage {
     if (data == null) return [];
 
     final jsonList = List<Map<String, dynamic>>.from(jsonDecode(data));
-    return jsonList.map((j) => ChatMessage(
-      conversationId: j['conversationId'],
-      role: j['role'],
-      content: j['content'],
-      tokensUsed: j['tokensUsed'] ?? 0,
-      model: j['model'],
-      createdAt: DateTime.parse(j['createdAt']),
-    )).toList();
+    return jsonList.map((j) => ChatMessage.fromJson(j)).toList();
   }
 }

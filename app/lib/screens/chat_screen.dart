@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/chat_provider.dart';
 import '../constants/app_constants.dart';
 
@@ -20,16 +21,23 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   final _scrollController = ScrollController();
   bool _isStreaming = false;
   File? _pendingImage;
+  bool _isDark = true;
 
   @override
   void initState() {
     super.initState();
+    _loadTheme();
     if (widget.initialPrompt != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _inputController.text = widget.initialPrompt!;
         _sendMessage();
       });
     }
+  }
+
+  Future<void> _loadTheme() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) setState(() => _isDark = prefs.getBool('dark_mode') ?? true);
   }
 
   @override
@@ -51,19 +59,49 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     });
   }
 
+  Color get _bg => _isDark ? const Color(0xFF09090B) : const Color(0xFFF8F9FA);
+  Color get _cardBg => _isDark ? const Color(0xFF18181B) : Colors.white;
+  Color get _borderColor => _isDark ? const Color(0xFF27272A) : const Color(0xFFE5E7EB);
+  Color get _textPrimary => _isDark ? Colors.white : const Color(0xFF18181B);
+  Color get _textSecondary => _isDark ? Colors.white54 : const Color(0xFF71717A);
+  Color get _accent => _isDark ? const Color(0xFFA78BFA) : const Color(0xFF7C3AED);
+  Color get _userBubble => _isDark ? const Color(0xFF27272A) : const Color(0xFFE5E7EB);
+  Color get _inputBg => _isDark ? const Color(0xFF18181B) : Colors.white;
+  Color get _sendBg => _isDark ? Colors.white : Colors.black;
+  Color get _sendIcon => _isDark ? Colors.black : Colors.white;
+
   Future<void> _pickImage() async {
     final picker = ImagePicker();
     final picked = await picker.pickImage(source: ImageSource.gallery, imageQuality: 70, maxWidth: 1024);
-    if (picked != null) {
-      setState(() => _pendingImage = File(picked.path));
-    }
+    if (picked != null) setState(() => _pendingImage = File(picked.path));
   }
 
   Future<void> _takePhoto() async {
     final picker = ImagePicker();
     final picked = await picker.pickImage(source: ImageSource.camera, imageQuality: 70, maxWidth: 1024);
+    if (picked != null) setState(() => _pendingImage = File(picked.path));
+  }
+
+  Future<void> _pickFile() async {
+    final picker = ImagePicker();
+    final picked = await picker.pickMedia();
     if (picked != null) {
-      setState(() => _pendingImage = File(picked.path));
+      final ext = picked.path.split('.').last.toLowerCase();
+      String? fileType;
+      if (['jpg', 'jpeg', 'png', 'gif', 'webp'].contains(ext)) {
+        fileType = 'image';
+      } else if (['mp4', 'mov', 'avi', 'mkv'].contains(ext)) {
+        fileType = 'video';
+      } else if (['pdf'].contains(ext)) {
+        fileType = 'pdf';
+      } else if (['doc', 'docx'].contains(ext)) {
+        fileType = 'document';
+      } else {
+        fileType = 'file';
+      }
+      setState(() {
+        _pendingImage = File(picked.path);
+      });
     }
   }
 
@@ -89,22 +127,24 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final messages = ref.watch(messagesProvider(widget.conversationId));
 
     return Scaffold(
+      backgroundColor: _bg,
       appBar: AppBar(
+        backgroundColor: _bg,
         leading: IconButton(
           onPressed: () => Navigator.pop(context),
-          icon: const Icon(Icons.arrow_back_ios, size: 20),
+          icon: Icon(Icons.arrow_back_ios, size: 20, color: _textPrimary),
         ),
         title: Row(
           children: [
-            const Text("IM'U", style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
+            Text("IM'U", style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: _textPrimary)),
             const SizedBox(width: 6),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
-                color: const Color(0xFFA78BFA).withAlpha(30),
+                color: _accent.withAlpha(30),
                 borderRadius: BorderRadius.circular(4),
               ),
-              child: Text(AppConstants.appVersion, style: const TextStyle(fontSize: 9, color: Color(0xFFA78BFA))),
+              child: Text(AppConstants.appVersion, style: TextStyle(fontSize: 9, color: _accent)),
             ),
           ],
         ),
@@ -114,7 +154,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               ref.read(conversationsProvider.notifier).createChat();
               Navigator.pop(context);
             },
-            icon: const Icon(Icons.add, size: 22),
+            icon: Icon(Icons.add, size: 22, color: _textPrimary),
           ),
         ],
       ),
@@ -127,20 +167,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Container(
-                          width: 56,
-                          height: 56,
+                          width: 56, height: 56,
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: _sendBg,
                             borderRadius: BorderRadius.circular(16),
                           ),
-                          child: const Center(
-                            child: Text('IM', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 18)),
-                          ),
+                          child: Center(child: Text('IM', style: TextStyle(color: _sendIcon, fontWeight: FontWeight.bold, fontSize: 18))),
                         ),
                         const SizedBox(height: 16),
-                        const Text("IM'U AI", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                        Text("IM'U AI", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: _textPrimary)),
                         const SizedBox(height: 4),
-                        Text('How can I help you today?', style: TextStyle(color: Colors.white.withAlpha(128))),
+                        Text('How can I help you today?', style: TextStyle(color: _textSecondary)),
                       ],
                     ),
                   )
@@ -161,15 +198,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                           children: [
                             if (!isUser) ...[
                               Container(
-                                width: 28,
-                                height: 28,
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFA78BFA),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: const Center(
-                                  child: Text('IM', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 9)),
-                                ),
+                                width: 28, height: 28,
+                                decoration: BoxDecoration(color: _accent, borderRadius: BorderRadius.circular(8)),
+                                child: Center(child: Text('IM', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 9))),
                               ),
                               const SizedBox(width: 8),
                             ],
@@ -177,7 +208,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                               child: Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                                 decoration: BoxDecoration(
-                                  color: isUser ? const Color(0xFF27272A) : Colors.transparent,
+                                  color: isUser ? _userBubble : Colors.transparent,
                                   borderRadius: BorderRadius.only(
                                     topLeft: const Radius.circular(16),
                                     topRight: const Radius.circular(16),
@@ -187,27 +218,36 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                 ),
                                 child: isLast && msg.content.isEmpty
                                     ? _buildTypingIndicator()
-                                    : isUser
-                                        ? Text(msg.content, style: const TextStyle(color: Colors.white, fontSize: 14))
-                                        : MarkdownBody(
-                                            data: msg.content,
-                                            styleSheet: MarkdownStyleSheet(
-                                              p: const TextStyle(color: Color(0xFFD4D4D8), fontSize: 14),
-                                              code: const TextStyle(
-                                                backgroundColor: Color(0xFF27272A),
-                                                color: Color(0xFFA78BFA),
-                                                fontSize: 13,
-                                              ),
-                                              codeblockDecoration: BoxDecoration(
-                                                color: const Color(0xFF18181B),
-                                                borderRadius: BorderRadius.circular(8),
-                                              ),
-                                              h1: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
-                                              h2: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-                                              h3: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-                                              listBullet: TextStyle(color: Colors.white.withAlpha(153)),
-                                            ),
-                                          ),
+                                    : Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          if (msg.fileUrl != null && msg.fileUrl!.isNotEmpty)
+                                            _buildAttachment(msg.fileType, msg.fileUrl!),
+                                          if (msg.fileUrl != null && msg.fileUrl!.isNotEmpty && msg.content.isNotEmpty)
+                                            const SizedBox(height: 8),
+                                          isUser
+                                              ? Text(msg.content, style: TextStyle(color: _textPrimary, fontSize: 14))
+                                              : MarkdownBody(
+                                                  data: msg.content,
+                                                  styleSheet: MarkdownStyleSheet(
+                                                    p: TextStyle(color: _textPrimary, fontSize: 14),
+                                                    code: TextStyle(
+                                                      backgroundColor: _borderColor,
+                                                      color: _accent,
+                                                      fontSize: 13,
+                                                    ),
+                                                    codeblockDecoration: BoxDecoration(
+                                                      color: _cardBg,
+                                                      borderRadius: BorderRadius.circular(8),
+                                                    ),
+                                                    h1: TextStyle(color: _textPrimary, fontSize: 20, fontWeight: FontWeight.bold),
+                                                    h2: TextStyle(color: _textPrimary, fontSize: 18, fontWeight: FontWeight.bold),
+                                                    h3: TextStyle(color: _textPrimary, fontSize: 16, fontWeight: FontWeight.bold),
+                                                    listBullet: TextStyle(color: _textSecondary),
+                                                  ),
+                                                ),
+                                        ],
+                                      ),
                               ),
                             ),
                           ],
@@ -229,13 +269,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         child: Image.file(_pendingImage!, width: 60, height: 60, fit: BoxFit.cover),
                       ),
                       Positioned(
-                        top: -4,
-                        right: -4,
+                        top: -4, right: -4,
                         child: GestureDetector(
                           onTap: () => setState(() => _pendingImage = null),
                           child: Container(
-                            width: 20,
-                            height: 20,
+                            width: 20, height: 20,
                             decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
                             child: const Icon(Icons.close, size: 12, color: Colors.white),
                           ),
@@ -244,28 +282,26 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     ],
                   ),
                   const SizedBox(width: 8),
-                  Text('Image attached', style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 12)),
+                  Text('Image attached', style: TextStyle(color: _textSecondary, fontSize: 12)),
                 ],
               ),
             ),
 
           Container(
             padding: const EdgeInsets.all(12),
-            decoration: const BoxDecoration(
-              border: Border(top: BorderSide(color: Color(0xFF27272A))),
-            ),
+            decoration: BoxDecoration(border: Border(top: BorderSide(color: _borderColor))),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: const Color(0xFF18181B),
+                color: _inputBg,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFF27272A)),
+                border: Border.all(color: _borderColor),
               ),
               child: Row(
                 children: [
                   IconButton(
                     onPressed: _showAttachmentSheet,
-                    icon: Icon(Icons.add, color: Colors.white.withAlpha(153), size: 22),
+                    icon: Icon(Icons.add, color: _textSecondary, size: 22),
                     constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
                   ),
                   Expanded(
@@ -277,29 +313,25 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       minLines: 1,
                       decoration: InputDecoration(
                         hintText: "Message IM'U...",
-                        hintStyle: TextStyle(color: Colors.white.withAlpha(128)),
+                        hintStyle: TextStyle(color: _textSecondary),
                         border: InputBorder.none,
                         contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
                       ),
-                      style: const TextStyle(color: Colors.white, fontSize: 14),
+                      style: TextStyle(color: _textPrimary, fontSize: 14),
                     ),
                   ),
                   const SizedBox(width: 4),
                   GestureDetector(
                     onTap: _sendMessage,
                     child: Container(
-                      width: 36,
-                      height: 36,
-                      decoration: const BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                      ),
+                      width: 36, height: 36,
+                      decoration: BoxDecoration(color: _sendBg, shape: BoxShape.circle),
                       child: _isStreaming
-                          ? const Padding(
-                              padding: EdgeInsets.all(8),
-                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
+                          ? Padding(
+                              padding: const EdgeInsets.all(8),
+                              child: CircularProgressIndicator(strokeWidth: 2, color: _sendIcon),
                             )
-                          : const Icon(Icons.arrow_upward, color: Colors.black, size: 20),
+                          : Icon(Icons.arrow_upward, color: _sendIcon, size: 20),
                     ),
                   ),
                 ],
@@ -311,42 +343,96 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     );
   }
 
+  Widget _buildAttachment(String? fileType, String fileUrl) {
+    final isImageType = fileType == 'image' || fileUrl.endsWith('.jpg') || fileUrl.endsWith('.jpeg') || fileUrl.endsWith('.png');
+
+    if (isImageType) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: Image.network(fileUrl, width: 200, fit: BoxFit.cover, errorBuilder: (_, __, ___) =>
+          Container(
+            width: 200, height: 120,
+            decoration: BoxDecoration(color: _borderColor, borderRadius: BorderRadius.circular(8)),
+            child: Icon(Icons.broken_image, color: _textSecondary),
+          ),
+        ),
+      );
+    }
+
+    IconData icon;
+    Color iconColor;
+    String label;
+
+    switch (fileType) {
+      case 'video':
+        icon = Icons.videocam;
+        iconColor = Colors.red;
+        label = 'Video attachment';
+        break;
+      case 'pdf':
+        icon = Icons.picture_as_pdf;
+        iconColor = Colors.red;
+        label = 'PDF document';
+        break;
+      case 'document':
+        icon = Icons.description;
+        iconColor = Colors.blue;
+        label = 'Document';
+        break;
+      default:
+        icon = Icons.attach_file;
+        iconColor = _accent;
+        label = 'File attachment';
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: _borderColor,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: iconColor, size: 24),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(label, style: TextStyle(color: _textPrimary, fontSize: 13)),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showAttachmentSheet() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF18181B),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
+      backgroundColor: _cardBg,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
       builder: (context) => Container(
         padding: const EdgeInsets.all(16),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 36,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.white.withAlpha(51),
-                borderRadius: BorderRadius.circular(2),
-              ),
+              width: 36, height: 4,
+              decoration: BoxDecoration(color: _textSecondary.withAlpha(51), borderRadius: BorderRadius.circular(2)),
             ),
             const SizedBox(height: 16),
             ListTile(
-              leading: const Icon(Icons.camera_alt, color: Colors.white70),
-              title: const Text('Take Photo', style: TextStyle(color: Colors.white)),
-              onTap: () {
-                Navigator.pop(context);
-                _takePhoto();
-              },
+              leading: Icon(Icons.camera_alt, color: _textSecondary),
+              title: Text('Take Photo', style: TextStyle(color: _textPrimary)),
+              onTap: () { Navigator.pop(context); _takePhoto(); },
             ),
             ListTile(
-              leading: const Icon(Icons.photo_library, color: Colors.white70),
-              title: const Text('Choose from Gallery', style: TextStyle(color: Colors.white)),
-              onTap: () {
-                Navigator.pop(context);
-                _pickImage();
-              },
+              leading: Icon(Icons.photo_library, color: _textSecondary),
+              title: Text('Choose from Gallery', style: TextStyle(color: _textPrimary)),
+              onTap: () { Navigator.pop(context); _pickImage(); },
+            ),
+            ListTile(
+              leading: Icon(Icons.attach_file, color: _textSecondary),
+              title: Text('Attach File (PDF/Video/Doc)', style: TextStyle(color: _textPrimary)),
+              onTap: () { Navigator.pop(context); _pickFile(); },
             ),
             const SizedBox(height: 8),
           ],
@@ -358,25 +444,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   Widget _buildTypingIndicator() {
     return Row(
       mainAxisSize: MainAxisSize.min,
-      children: [
-        _dot(0),
-        const SizedBox(width: 4),
-        _dot(150),
-        const SizedBox(width: 4),
-        _dot(300),
-      ],
+      children: [_dot(0), const SizedBox(width: 4), _dot(150), const SizedBox(width: 4), _dot(300)],
     );
   }
 
   Widget _dot(int delay) {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 600),
-      width: 8,
-      height: 8,
-      decoration: BoxDecoration(
-        color: Colors.white.withAlpha(128),
-        shape: BoxShape.circle,
-      ),
+      width: 8, height: 8,
+      decoration: BoxDecoration(color: _textSecondary, shape: BoxShape.circle),
     );
   }
 }
