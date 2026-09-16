@@ -1,0 +1,71 @@
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../models/conversation.dart';
+import '../models/chat_message.dart';
+
+class LocalStorage {
+  static const _conversationsKey = 'conversations';
+  static const _messagesKey = 'messages';
+
+  Future<void> saveConversations(List<Conversation> conversations) async {
+    final prefs = await SharedPreferences.getInstance();
+    final jsonList = conversations.map((c) => {
+      'id': c.id,
+      'remoteId': c.remoteId,
+      'title': c.title,
+      'model': c.model,
+      'isArchived': c.isArchived,
+      'createdAt': c.createdAt.toIso8601String(),
+      'updatedAt': c.updatedAt.toIso8601String(),
+    }).toList();
+    await prefs.setString(_conversationsKey, jsonEncode(jsonList));
+  }
+
+  Future<List<Conversation>> loadConversations() async {
+    final prefs = await SharedPreferences.getInstance();
+    final data = prefs.getString(_conversationsKey);
+    if (data == null) return [];
+
+    final jsonList = List<Map<String, dynamic>>.from(jsonDecode(data));
+    return jsonList.map((j) => Conversation(
+      remoteId: j['remoteId'],
+      title: j['title'],
+      model: j['model'] ?? 'gpt-4o-mini',
+      isArchived: j['isArchived'] ?? false,
+      createdAt: DateTime.parse(j['createdAt']),
+      updatedAt: DateTime.parse(j['updatedAt']),
+    )..id = j['id']).toList();
+  }
+
+  Future<void> saveMessages(String conversationId, List<ChatMessage> messages) async {
+    final prefs = await SharedPreferences.getInstance();
+    final key = '${_messagesKey}_$conversationId';
+    final jsonList = messages.map((m) => {
+      'id': m.id,
+      'conversationId': m.conversationId,
+      'role': m.role,
+      'content': m.content,
+      'tokensUsed': m.tokensUsed,
+      'model': m.model,
+      'createdAt': m.createdAt.toIso8601String(),
+    }).toList();
+    await prefs.setString(key, jsonEncode(jsonList));
+  }
+
+  Future<List<ChatMessage>> loadMessages(String conversationId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final key = '${_messagesKey}_$conversationId';
+    final data = prefs.getString(key);
+    if (data == null) return [];
+
+    final jsonList = List<Map<String, dynamic>>.from(jsonDecode(data));
+    return jsonList.map((j) => ChatMessage(
+      conversationId: j['conversationId'],
+      role: j['role'],
+      content: j['content'],
+      tokensUsed: j['tokensUsed'] ?? 0,
+      model: j['model'],
+      createdAt: DateTime.parse(j['createdAt']),
+    )..id = j['id']).toList();
+  }
+}
