@@ -76,6 +76,13 @@ Future<void> _initializeBackgroundServices() async {
     print('Permission request skipped: $e');
   }
 
+  // Ask for "Alarms & reminders" access before scheduling anything.
+  try {
+    await AlarmService.requestExactAlarmPermission();
+  } catch (e) {
+    print('Exact alarm request skipped: $e');
+  }
+
   try {
     await AlarmService.init();
   } catch (e) {
@@ -83,9 +90,19 @@ Future<void> _initializeBackgroundServices() async {
   }
 
   try {
-    await TimetableService().mergeRemote();
+    final timetable = TimetableService();
+    await timetable.mergeRemote();
+    // AlarmManager entries are lost when the process dies, so every launch
+    // must re-arm both the timetable reminders and the user's own alarms.
+    await AlarmService.rescheduleAll(await timetable.loadLocal());
   } catch (e) {
-    print('Timetable sync skipped: $e');
+    print('Timetable alarms skipped: $e');
+  }
+
+  try {
+    await AlarmService.rearmSavedAlarms();
+  } catch (e) {
+    print('Saved alarms skipped: $e');
   }
 }
 

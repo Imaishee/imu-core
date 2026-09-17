@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/class_schedule.dart';
+import 'ai_actions_service.dart';
 import 'alarm_service.dart';
 
 class TimetableService {
@@ -125,58 +126,10 @@ class TimetableService {
     await saveAll(merged);
   }
 
-  /// Parse a pasted timetable text into ClassSchedule list using AI.
+  /// Parse a pasted timetable text into ClassSchedule list using the
+  /// tool-calling `ai-actions` endpoint. Does NOT persist — the caller
+  /// previews the result and saves what the user confirms.
   static Future<List<ClassSchedule>> parseWithAI(String text) async {
-    try {
-      final client = Supabase.instance.client;
-      final resp = await client.functions.invoke(
-        'chat',
-        body: {
-          'messages': [
-            {
-              'role': 'user',
-              'content':
-                  'Parse the following class timetable and return ONLY a JSON array. '
-                  'Each item: {"course_name": "...", "course_code": "...", "instructor": "...", '
-                  '"room": "...", "building": "...", "day": "Monday", "start_time": "09:00", '
-                  '"end_time": "10:30", "reminder_minutes": 10}. '
-                  'Infer day and time from the text. Return ONLY valid JSON, no markdown, no prose.\n\n'
-                  'TIMETABLE:\n$text',
-            },
-          ],
-          'model': 'openai/gpt-oss-20b',
-        },
-      );
-      final data = resp.data;
-      // The stream endpoint returns chunks; handle both raw json + accumulated
-      String content = '';
-      if (data is String) {
-        content = data;
-      } else if (data is Map && data['content'] != null) {
-        content = data['content'].toString();
-      }
-      final start = content.indexOf('[');
-      final end = content.lastIndexOf(']');
-      if (start < 0 || end <= start) return [];
-      final jsonStr = content.substring(start, end + 1);
-      final list = jsonDecode(jsonStr) as List;
-      return list.map((e) {
-        final m = e as Map<String, dynamic>;
-        return ClassSchedule(
-          id: DateTime.now().microsecondsSinceEpoch.toString() + (list.indexOf(e)).toString(),
-          courseName: m['course_name']?.toString() ?? 'Class',
-          courseCode: m['course_code']?.toString() ?? '',
-          instructor: m['instructor']?.toString() ?? '',
-          room: m['room']?.toString() ?? '',
-          building: m['building']?.toString() ?? '',
-          day: m['day']?.toString() ?? 'Monday',
-          startTime: m['start_time']?.toString() ?? '09:00',
-          endTime: m['end_time']?.toString() ?? '10:00',
-          reminderMinutes: (m['reminder_minutes'] as num?)?.toInt() ?? 10,
-        );
-      }).toList();
-    } catch (e) {
-      rethrow;
-    }
+    return AiActionsService().parseTimetable(text);
   }
 }

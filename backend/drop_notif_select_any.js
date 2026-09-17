@@ -10,12 +10,17 @@ const c = new Client({ connectionString });
 
 (async () => {
   await c.connect();
+  await c.query('DROP POLICY IF EXISTS "notif_select_any" ON public.notifications');
+  console.log('dropped notif_select_any');
+
   const r = await c.query(
-    'SELECT id, version, download_url, force_update, created_at FROM app_versions ORDER BY created_at DESC',
+    `SELECT policyname, cmd, roles::text AS roles, qual
+     FROM pg_policies
+     WHERE tablename = 'notifications'
+     ORDER BY policyname`,
   );
-  console.log('rows:', r.rows.length);
   for (const row of r.rows) {
-    console.log(JSON.stringify(row));
+    console.log(`- ${row.policyname} | ${row.cmd} | roles=${row.roles} | using=${row.qual}`);
   }
   await c.end();
 })().catch((e) => {

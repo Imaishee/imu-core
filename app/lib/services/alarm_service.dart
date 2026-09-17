@@ -1,7 +1,13 @@
+import 'dart:convert';
+
+import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
+
+import '../models/alarm_item.dart';
 import '../models/class_schedule.dart';
 
 /// Native alarm service. Scheduled notifications fire even when the
@@ -12,9 +18,17 @@ class AlarmService {
 
   static const _channelId = 'imu_class_reminders';
   static const _channelName = 'Class & Study Reminders';
-  static const _channelDesc = 'Reminders for your classes, study sessions and alarms';
+  static const _channelDesc =
+      'Reminders for your classes, study sessions and alarms';
+
+  static const _alarmsPrefsKey = 'alarms';
 
   static bool _initialized = false;
+
+  /// True when Android refused exact alarms; scheduling falls back to
+  /// inexact so alarms still fire (possibly a few minutes late).
+  static bool _exactDenied = false;
+  static bool get exactDenied => _exactDenied;
 
   /// Must be called once in main() before any scheduling.
   static Future<void> init() async {
@@ -29,7 +43,8 @@ class AlarmService {
       } catch (_) {
         // Fall back to an offset guess if the plugin is unavailable.
         final offset = DateTime.now().timeZoneOffset;
-        tz.setLocalLocation(tz.getLocation('Etc/GMT${offset.isNegative ? '+' : '-'}${offset.inHours.abs()}'));
+        tz.setLocalLocation(tz.getLocation(
+            'Etc/GMT${offset.isNegative ? '+' : '-'}${offset.inHours.abs()}'));
       }
 
       const android = AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -43,22 +58,23 @@ class AlarmService {
         onDidReceiveNotificationResponse: (details) {},
       );
 
-      await _plugin
-          .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
-          ?.createNotificationChannel(const AndroidNotificationChannel(
-            _channelId,
-            _channelName,
-            description: _channelDesc,
-            importance: Importance.max,
-            playSound: true,
-            enableVibration: true,
-            enableLights: true,
-          ));
+      final androidImpl = _plugin.resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>();
+
+      await androidImpl?.createNotificationChannel(
+        const AndroidNotificationChannel(
+          _channelId,
+          _channelName,
+          description: _channelDesc,
+          importance: Importance.max,
+          playSound: true,
+          enableVibration: true,
+          enableLights: true,
+        ),
+      );
 
       // Re-request notification permission (Android 13+)
-      await _plugin
-          .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
-          ?.requestNotificationsPermission();
+      await androidImpl?.requestNotificationsPermission();
 
       _initialized = true;
     } catch (e) {
@@ -68,10 +84,123 @@ class AlarmService {
 
   static bool get isInitialized => _initialized;
 
+  /// Ask for the "Alarms & reminders" special access. Returns true when the
+  /// OS allows exact alarms (also true on Android < 12 / iOS).
+  static Future<bool> requestExactAlarmPermission() async {
+    if (!_initialized) await init();
+    try {
+      final androidImpl = _plugin.resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>();
+      final granted = await androidImpl?.requestExactAlarmsPermission();
+      _exactDenied = granted == false;
+      return granted ?? true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// True when the OS currently permits exact alarms.
+  static Future<bool> canScheduleExact() async {
+    try {
+      final androidImpl = _plugin.resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>();
+      final allowed = await androidImpl?.canScheduleExactNotifications();
+      return allowed ?? true;
+    } catch (_) {
+      return true;
+    }
+  }
+
   static int _dayToIndex(String day) {
-    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    const days = [
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday'
+    ];
     final i = days.indexOf(day);
     return i < 0 ? 0 : i + 1; // DateTime.monday = 1
+  }
+
+  /// Bounded, collision-free notification id for a user alarm.
+  /// Raw ids are millisecond timestamps, which overflow Android's 32-bit
+  /// notification id, so they must be folded into a small range.
+  static int alarmNotificationId(int rawId, int dayIdx) =>
+      ((rawId.abs() % 100000) * 7) + dayIdx.clamp(0, 6);
+
+  static NotificationDetails _alarmDetails({bool fullScreen = true}) =>
+      NotificationDetails(
+        android: AndroidNotificationDetails(
+          _channelId,
+          _channelName,
+          channelDescription: _channelDesc,
+          importance: Importance.max,
+          priority: Priority.high,
+          playSound: true,
+          enableVibration: true,
+          fullScreenIntent: fullScreen,
+          category: AndroidNotificationCategory.alarm,
+          visibility: NotificationVisibility.public,
+        ),
+        iOS: const DarwinNotificationDetails(
+          presentAlert: true,
+          presentSound: true,
+        ),
+      );
+
+  /// Schedules, downgrading to an inexact alarm when the OS denies exact
+  /// alarms instead of throwing and losing the reminder entirely.
+  static Future<void> _scheduleSafe(
+    int id,
+    String title,
+    String body,
+    tz.TZDateTime when,
+    DateTimeComponents? repeat,
+  ) async {
+    final details = _alarmDetails();
+    try {
+      await _plugin.zonedSchedule(
+        id,
+        title,
+        body,
+        when,
+        details,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        matchDateTimeComponents: repeat,
+      );
+      return;
+    } on PlatformException catch (e) {
+      if (e.code != 'exact_alarms_not_permitted') rethrow;
+      _exactDenied = true;
+    } catch (_) {
+      // fall through to inexact
+    }
+
+    await _plugin.zonedSchedule(
+      id,
+      title,
+      body,
+      when,
+      details,
+      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+      matchDateTimeComponents: repeat,
+    );
+  }
+
+  /// Next occurrence of [hh]:[mm] on weekday [dayIndex] (1=Mon..7=Sun).
+  static tz.TZDateTime _nextOccurrence(int hh, int mm, int dayIndex) {
+    final now = tz.TZDateTime.now(tz.local);
+    var when = tz.TZDateTime(tz.local, now.year, now.month, now.day, hh, mm);
+    if (when.isBefore(now)) when = when.add(const Duration(days: 1));
+    if (dayIndex >= 1 && dayIndex <= 7) {
+      while (when.weekday != dayIndex) {
+        when = when.add(const Duration(days: 1));
+      }
+    }
+    return when;
   }
 
   /// Schedule a weekly-recurring reminder for a class.
@@ -83,77 +212,62 @@ class AlarmService {
     final hh = int.parse(parts[0]);
     final mm = int.parse(parts[1]);
 
-    final now = tz.TZDateTime.now(tz.local);
-    var when = tz.TZDateTime(tz.local, now.year, now.month, now.day, hh, mm);
-    // If the class time today already passed, roll to next week
-    while (when.isBefore(now)) {
-      when = when.add(const Duration(days: 7));
-    }
-    // Align to correct weekday
-    while (when.weekday != dayIndex) {
-      when = when.add(const Duration(days: 1));
-    }
-    if (when.isBefore(now)) {
-      when = when.add(const Duration(days: 7));
-    }
-
-    // Reminder: fire `reminderMinutes` before class start
+    final when = _nextOccurrence(hh, mm, dayIndex);
     final remindAt = when.subtract(Duration(minutes: cls.reminderMinutes));
     final id = cls.id.hashCode & 0x7fffffff;
 
-    final details = _buildDetails(cls, isReminder: true);
-    await _plugin.zonedSchedule(
+    final reminder = _buildDetails(cls, isReminder: true);
+    await _scheduleSafe(
       id,
-      details['title'],
-      details['body'],
+      reminder['title']!,
+      reminder['body']!,
       remindAt,
-      const NotificationDetails(
-        android: AndroidNotificationDetails(
-          _channelId,
-          _channelName,
-          channelDescription: _channelDesc,
-          importance: Importance.max,
-          priority: Priority.high,
-          playSound: true,
-          enableVibration: true,
-          fullScreenIntent: true,
-          category: AndroidNotificationCategory.alarm,
-          visibility: NotificationVisibility.public,
-        ),
-        iOS: DarwinNotificationDetails(presentAlert: true, presentSound: true),
-      ),
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
+      DateTimeComponents.dayOfWeekAndTime,
     );
 
-    // Also schedule "class starting now" notification (optional, always on)
-    final startNowAt = when;
-    final nowDetails = _buildDetails(cls, isReminder: false);
-    await _plugin.zonedSchedule(
+    final starting = _buildDetails(cls, isReminder: false);
+    await _scheduleSafe(
       id + 1,
-      nowDetails['title'],
-      nowDetails['body'],
-      startNowAt,
-      const NotificationDetails(
-        android: AndroidNotificationDetails(
-          _channelId,
-          _channelName,
-          channelDescription: _channelDesc,
-          importance: Importance.max,
-          priority: Priority.high,
-          playSound: true,
-          enableVibration: true,
-          category: AndroidNotificationCategory.alarm,
-          visibility: NotificationVisibility.public,
-        ),
-      ),
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
+      starting['title']!,
+      starting['body']!,
+      when,
+      DateTimeComponents.dayOfWeekAndTime,
     );
   }
 
+  /// Schedule a repeating alarm on each weekday in [days] (1=Mon..7=Sun).
+  static Future<void> scheduleRepeatingAlarm({
+    required int id,
+    required String title,
+    required String body,
+    required String time,
+    required List<int> days,
+  }) async {
+    if (!_initialized) await init();
+    final parts = time.split(':');
+    final hh = int.parse(parts[0]);
+    final mm = int.parse(parts[1]);
+
+    // Clear any stale ids first so removed days don't keep firing.
+    for (var d = 0; d < 7; d++) {
+      await _plugin.cancel(alarmNotificationId(id, d));
+    }
+
+    for (final d in days) {
+      final when = _nextOccurrence(hh, mm, d);
+      await _scheduleSafe(
+        alarmNotificationId(id, d),
+        title,
+        body,
+        when,
+        DateTimeComponents.dayOfWeekAndTime,
+      );
+    }
+  }
+
   /// Schedule a one-off user alarm (e.g. from Alarms screen).
-  static Future<void> scheduleOneOff({
+  /// Returns false when the time is already in the past.
+  static Future<bool> scheduleOneOff({
     required int id,
     required String title,
     required String body,
@@ -161,29 +275,68 @@ class AlarmService {
   }) async {
     if (!_initialized) await init();
     final tzWhen = tz.TZDateTime.from(when, tz.local);
-    if (tzWhen.isBefore(tz.TZDateTime.now(tz.local))) return;
-    await _plugin.zonedSchedule(
-      id,
-      title,
-      body,
-      tzWhen,
-      const NotificationDetails(
-        android: AndroidNotificationDetails(
-          _channelId,
-          _channelName,
-          channelDescription: _channelDesc,
-          importance: Importance.max,
-          priority: Priority.high,
-          playSound: true,
-          enableVibration: true,
-          fullScreenIntent: true,
-          category: AndroidNotificationCategory.alarm,
-          visibility: NotificationVisibility.public,
-        ),
-        iOS: DarwinNotificationDetails(presentAlert: true, presentSound: true),
-      ),
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-    );
+    if (!tzWhen.isAfter(tz.TZDateTime.now(tz.local))) return false;
+    await _scheduleSafe(id, title, body, tzWhen, null);
+    return true;
+  }
+
+  /// Schedule an [AlarmItem] taking its repeat days into account.
+  static Future<void> scheduleAlarm(AlarmItem item) async {
+    if (!_initialized) await init();
+    if (item.days.isEmpty) {
+      final parts = item.time.split(':');
+      final now = DateTime.now();
+      var when = DateTime(
+        now.year,
+        now.month,
+        now.day,
+        int.parse(parts[0]),
+        int.parse(parts[1]),
+      );
+      if (!when.isAfter(now)) when = when.add(const Duration(days: 1));
+      await scheduleOneOff(
+        id: alarmNotificationId(item.id, 0),
+        title: item.label,
+        body: 'Alarm · ${item.time}',
+        when: when,
+      );
+    } else {
+      await scheduleRepeatingAlarm(
+        id: item.id,
+        title: item.label,
+        body: item.days.length == 7
+            ? 'Alarm · every day at ${item.time}'
+            : 'Alarm · ${item.time}',
+        time: item.time,
+        days: item.days,
+      );
+    }
+  }
+
+  static Future<void> cancelAlarm(AlarmItem item) async {
+    for (var d = 0; d < 7; d++) {
+      await _plugin.cancel(alarmNotificationId(item.id, d));
+    }
+  }
+
+  /// Re-arm every enabled alarm saved in prefs. Safe to call on every launch;
+  /// called on startup and after boot because AlarmManager entries do not
+  /// survive a process kill or reboot.
+  static Future<void> rearmSavedAlarms() async {
+    if (!_initialized) await init();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (!(prefs.getBool('notif_enabled') ?? true)) return;
+      final raw = prefs.getStringList(_alarmsPrefsKey) ?? const [];
+      for (final entry in raw) {
+        final map = Map<String, dynamic>.from(jsonDecode(entry) as Map);
+        final item = AlarmItem.fromMap(map);
+        if (!item.enabled) continue;
+        await scheduleAlarm(item);
+      }
+    } catch (_) {
+      // never block app startup on alarm re-arming
+    }
   }
 
   /// Show an immediate local notification (in-app, e.g. study session).
@@ -193,23 +346,7 @@ class AlarmService {
     required String body,
   }) async {
     if (!_initialized) await init();
-    await _plugin.show(
-      id,
-      title,
-      body,
-      const NotificationDetails(
-        android: AndroidNotificationDetails(
-          _channelId,
-          _channelName,
-          channelDescription: _channelDesc,
-          importance: Importance.max,
-          priority: Priority.high,
-          playSound: true,
-          enableVibration: true,
-        ),
-        iOS: DarwinNotificationDetails(presentAlert: true, presentSound: true),
-      ),
-    );
+    await _plugin.show(id, title, body, _alarmDetails(fullScreen: false));
   }
 
   static Future<void> cancelClass(ClassSchedule cls) async {
@@ -230,15 +367,20 @@ class AlarmService {
   static Future<void> rescheduleAll(List<ClassSchedule> classes) async {
     if (!_initialized) await init();
     for (final c in classes) {
-      if (c.notificationEnabled) {
-        await scheduleClass(c);
-      } else {
-        await cancelClass(c);
+      try {
+        if (c.notificationEnabled) {
+          await scheduleClass(c);
+        } else {
+          await cancelClass(c);
+        }
+      } catch (_) {
+        // one bad entry must not abort the rest of the timetable
       }
     }
   }
 
-  static Map<String, String> _buildDetails(ClassSchedule cls, {required bool isReminder}) {
+  static Map<String, String> _buildDetails(ClassSchedule cls,
+      {required bool isReminder}) {
     final title = isReminder
         ? '${cls.title} in ${cls.reminderMinutes} min'
         : '${cls.title} is starting now';

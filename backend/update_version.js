@@ -22,7 +22,7 @@ const c = new Client({ connectionString });
     [
       VERSION,
       downloadUrl,
-      'Fix: app no longer white-screens on launch, alarms now fire at the correct local time, light-mode text visibility, working in-app update button.',
+      'Fix: admin notifications now show up in the app, alarms repeat on the days you pick and fire reliably, and you can now just ask the AI to add/remove classes or set an alarm.',
     ],
   );
   console.log('Updated:', JSON.stringify(r.rows, null, 2));

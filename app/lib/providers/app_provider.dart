@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/class_schedule.dart';
 import '../services/timetable_service.dart';
 import '../services/permission_service.dart';
+import '../services/notification_service.dart';
 
 class UserProfile {
   final String id;
@@ -127,6 +128,50 @@ final nextClassProvider = Provider<ClassSchedule?>((ref) {
     }
   }
   return best;
+});
+
+final notificationServiceProvider = Provider((ref) => NotificationService());
+
+/// Admin/system notification inbox, backed by the `notifications` table.
+final notificationsProvider =
+    NotifierProvider<NotificationsNotifier, List<AppNotification>>(
+        NotificationsNotifier.new);
+
+class NotificationsNotifier extends Notifier<List<AppNotification>> {
+  final _service = NotificationService();
+
+  @override
+  List<AppNotification> build() {
+    _load();
+    return [];
+  }
+
+  Future<void> _load() async {
+    try {
+      state = await _service.fetchInbox();
+    } catch (_) {
+      state = [];
+    }
+  }
+
+  Future<void> refresh() => _load();
+
+  Future<void> markRead(String id) async {
+    await _service.markRead(id);
+    state = [
+      for (final n in state)
+        if (n.id == id) n.copyWith(isRead: true) else n,
+    ];
+  }
+
+  Future<void> markAllRead() async {
+    await _service.markAllRead(state.map((n) => n.id));
+    state = [for (final n in state) n.copyWith(isRead: true)];
+  }
+}
+
+final unreadNotificationsProvider = Provider<int>((ref) {
+  return ref.watch(notificationsProvider).where((n) => !n.isRead).length;
 });
 
 final permissionsProvider =

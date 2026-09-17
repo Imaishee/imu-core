@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/app_theme.dart';
+import '../models/alarm_item.dart';
 import '../services/permission_service.dart';
 import '../services/alarm_service.dart';
 import 'dart:convert';
@@ -39,8 +40,31 @@ class _AlarmsScreenState extends State<AlarmsScreen> {
       _loading = false;
     });
 
-    // Request exact alarm permission if needed
+    // Notification + exact alarm permissions, then re-arm saved alarms.
+    // AlarmManager entries do not survive a process kill, so this is what
+    // keeps existing alarms alive between launches.
     await PermissionService.requestCorePermissions();
+    final exact = await AlarmService.requestExactAlarmPermission();
+    if (!exact) await AlarmService.canScheduleExact();
+    await AlarmService.rearmSavedAlarms();
+  }
+
+  void _showExactAlarmHint() {
+    if (!AlarmService.exactDenied || !mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text(
+            'Exact alarms are blocked. Enable "Alarms & reminders" for IM\'U in Android settings so alarms fire on time.'),
+        action: SnackBarAction(
+          label: 'Retry',
+          onPressed: () async {
+            await AlarmService.requestExactAlarmPermission();
+            await AlarmService.rearmSavedAlarms();
+          },
+        ),
+        duration: const Duration(seconds: 6),
+      ),
+    );
   }
 
   Future<void> _save() async {
@@ -61,25 +85,13 @@ class _AlarmsScreenState extends State<AlarmsScreen> {
     if (enabled) {
       await _scheduleNotification(item);
     } else {
-      await AlarmService.cancel(item.id);
+      await AlarmService.cancelAlarm(item);
     }
   }
 
   Future<void> _scheduleNotification(AlarmItem item) async {
-    // Schedule a one-off exact alarm
-    final parts = item.time.split(':');
-    final hh = int.parse(parts[0]);
-    final mm = int.parse(parts[1]);
-    final now = DateTime.now();
-    var when = DateTime(now.year, now.month, now.day, hh, mm);
-    if (when.isBefore(now)) when = when.add(const Duration(days: 1));
-
-    await AlarmService.scheduleOneOff(
-      id: item.id,
-      title: item.label,
-      body: item.dayString,
-      when: when,
-    );
+    await AlarmService.scheduleAlarm(item);
+    _showExactAlarmHint();
   }
 
   Future<void> _addAlarm() async {
@@ -94,10 +106,13 @@ class _AlarmsScreenState extends State<AlarmsScreen> {
   }
 
   Future<void> _deleteAlarm(int id) async {
-    _alarms.removeWhere((a) => a.id == id);
+    final idx = _alarms.indexWhere((a) => a.id == id);
+    if (idx < 0) return;
+    final item = _alarms[idx];
+    _alarms.removeAt(idx);
     setState(() {});
     await _save();
-    await AlarmService.cancel(id);
+    await AlarmService.cancelAlarm(item);
   }
 
   @override
@@ -253,31 +268,6 @@ class _AlarmsScreenState extends State<AlarmsScreen> {
   }
 }
 
-class AlarmItem {
-  final int id;
-  final String label;
-  final String time;
-  final String day;
-  final bool enabled;
-
-  const AlarmItem({required this.id, required this.label, required this.time, this.day = '', this.enabled = true});
-
-  Map<String, dynamic> toMap() => {'id': id, 'label': label, 'time': time, 'day': day, 'enabled': enabled};
-
-  factory AlarmItem.fromMap(Map<String, dynamic> m) => AlarmItem(
-        id: m['id'] as int,
-        label: m['label'] as String,
-        time: m['time'] as String,
-        day: m['day'] as String? ?? '',
-        enabled: m['enabled'] as bool? ?? true,
-      );
-
-  String get dayString => day.isNotEmpty ? '$day · $time' : time;
-
-  AlarmItem copyWith({String? label, String? time, bool? enabled}) =>
-      AlarmItem(id: id, label: label ?? this.label, time: time ?? this.time, day: day, enabled: enabled ?? this.enabled);
-}
-
 class _AlarmDialog extends StatefulWidget {
   final Function(AlarmItem) onSave;
   const _AlarmDialog({required this.onSave});
@@ -363,7 +353,7 @@ class _AlarmDialogState extends State<_AlarmDialog> {
               id: DateTime.now().millisecondsSinceEpoch,
               label: _labelCtrl.text.trim(),
               time: _time,
-              day: _settingsDayString(),
+              days: _selectedDays(),
               enabled: true,
             ));
             Navigator.pop(context);
@@ -375,8 +365,8 @@ class _AlarmDialogState extends State<_AlarmDialog> {
     );
   }
 
-  String _settingsDayString() {
-    final selected = [for (int i = 0; i < 7; i++) if (_days[i]) _dayNames[i]];
-    return selected.isEmpty ? 'One-time' : selected.join(', ');
+  /// ISO weekdays (1=Mon..7=Sun) currently selected in the dialog.
+  List<int> _selectedDays() {
+    return [for (int i = 0; i < 7; i++) if (_days[i]) i + 1];
   }
 }

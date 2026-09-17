@@ -137,4 +137,22 @@ class AppNotification {
         isRead: m['is_read'] ?? m['isRead'] ?? false,
         actionUrl: m['action_url']?.toString(),
       );
+
+  AppNotification copyWith({
+    String? title,
+    String? body,
+    String? type,
+    DateTime? createdAt,
+    bool? isRead,
+    String? actionUrl,
+  }) =>
+      AppNotification(
+        id: id,
+        title: title ?? this.title,
+        body: body ?? this.body,
+        type: type ?? this.type,
+        createdAt: createdAt ?? this.createdAt,
+        isRead: isRead ?? this.isRead,
+        actionUrl: actionUrl ?? this.actionUrl,
+      );
 }
