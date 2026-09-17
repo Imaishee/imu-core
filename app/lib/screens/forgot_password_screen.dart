@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme/app_theme.dart';
+import 'otp_screen.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -31,13 +31,15 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     setState(() { _loading = true; _error = null; });
 
     try {
-      await Supabase.instance.client.auth.resetPasswordForEmail(
-        email,
-        redirectTo: 'com.imu://reset-password',
-      );
-      if (mounted) setState(() => _sent = true);
-    } on AuthException catch (e) {
-      setState(() => _error = e.message);
+      // Navigate to the OTP screen which sends the code and collects a new
+      // password — no broken redirect needed.
+      await Future.delayed(const Duration(milliseconds: 300));
+      if (mounted) {
+        _loading = false;
+        Navigator.push(context, MaterialPageRoute(
+          builder: (_) => OtpScreen(email: email, flow: OtpFlow.recovery),
+        ));
+      }
     } catch (_) {
       setState(() => _error = 'Something went wrong. Please try again.');
     }

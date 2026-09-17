@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme/app_theme.dart';
 import 'forgot_password_screen.dart';
-import 'verification_screen.dart';
+import 'otp_screen.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -46,19 +46,19 @@ class _AuthScreenState extends State<AuthScreen> {
         final resp = await client.auth.signUp(
           email: _emailCtrl.text.trim(),
           password: _passCtrl.text,
-          emailRedirectTo: 'com.imu://verify',
+          emailRedirectTo: 'https://imu-admin-panel.vercel.app/verify',
           data: {
             'full_name': _nameCtrl.text.trim(),
           },
         );
         if (resp.user != null && mounted) {
-          if (resp.user!.emailConfirmedAt != null) {
-            Navigator.pushReplacementNamed(context, '/home');
-          } else {
-            Navigator.push(context, MaterialPageRoute(
-              builder: (_) => VerificationScreen(email: _emailCtrl.text.trim()),
-            ));
-          }
+          // Send a verification OTP and show the OTP entry screen.
+          Navigator.push(context, MaterialPageRoute(
+            builder: (_) => OtpScreen(
+              email: _emailCtrl.text.trim(),
+              flow: OtpFlow.signup,
+            ),
+          ));
         }
       }
     } on AuthException catch (e) {
