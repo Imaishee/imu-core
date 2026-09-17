@@ -66,9 +66,22 @@ class AlarmService {
       await _plugin.initialize(
         const InitializationSettings(android: android, iOS: ios),
         onDidReceiveNotificationResponse: (details) {
-          // User tapped "Dismiss" on an alarm — cancel it so the sound stops.
-          if (details.actionId == 'alarm_dismiss' && details.id != null) {
-            _plugin.cancel(details.id!);
+          final id = details.id;
+          if (id == null) return;
+          if (details.actionId == 'alarm_dismiss') {
+            _plugin.cancel(id);
+          } else if (details.actionId == 'alarm_snooze') {
+            // Cancel current alarm, re-schedule for 5 minutes later
+            _plugin.cancel(id);
+            final snoozeTime = tz.TZDateTime.now(tz.local).add(const Duration(minutes: 5));
+            _plugin.zonedSchedule(
+              id,
+              'Snoozed alarm',
+              'Tap to dismiss',
+              snoozeTime,
+              _alarmDetails(),
+              androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+            );
           }
         },
       );
@@ -182,14 +195,19 @@ class AlarmService {
           category: AndroidNotificationCategory.alarm,
           visibility: NotificationVisibility.public,
           audioAttributesUsage: AudioAttributesUsage.alarm,
-          // Without this the alarm respects the ringer volume and is silent
-          // whenever the phone is on silent/vibrate.  (`bypassDnd` is a
-          // channel-only setting and is applied in init().)
+          // Lock screen: show title + body + actions on lock screen
+          styleInformation: DefaultStyleInformation(true, true),
           ongoing: true,
           autoCancel: false,
           // FLAG_INSISTENT (4) — sound loops until dismissed.
-          additionalFlags: Int32List.fromList(const [4]),
+          // FLAG_NO_CLEAR (32) — survives "Clear All" notifications.
+          additionalFlags: Int32List.fromList(const [4, 32]),
           actions: [
+            const AndroidNotificationAction(
+              'alarm_snooze',
+              'Snooze 5 min',
+              cancelNotification: false,
+            ),
             const AndroidNotificationAction(
               'alarm_dismiss',
               'Dismiss',
@@ -200,6 +218,8 @@ class AlarmService {
         iOS: const DarwinNotificationDetails(
           presentAlert: true,
           presentSound: true,
+          presentBanner: true,
+          presentList: true,
         ),
       );
 
