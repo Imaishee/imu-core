@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme/app_theme.dart';
+import 'forgot_password_screen.dart';
+import 'verification_screen.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -64,7 +66,9 @@ class _AuthScreenState extends State<AuthScreen> {
           if (resp.user!.emailConfirmedAt != null) {
             Navigator.pushReplacementNamed(context, '/home');
           } else {
-            setState(() => _error = 'Check your email — click the confirmation link to activate your account. The link goes to our secure site now.');
+            Navigator.push(context, MaterialPageRoute(
+              builder: (_) => VerificationScreen(email: _emailCtrl.text.trim()),
+            ));
           }
         }
       }
@@ -243,33 +247,8 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   void _showForgotPassword() {
-    final ctrl = TextEditingController(text: _emailCtrl.text.trim());
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppTheme.surface,
-        title: Text('Reset Password', style: TextStyle(color: AppTheme.textMain)),
-        content: TextField(
-          controller: ctrl,
-          decoration: InputDecoration(hintText: 'Your email', prefixIcon: Icon(Icons.email_outlined, color: AppColors.greenMedium), filled: true, fillColor: AppTheme.surface),
-          style: TextStyle(color: AppTheme.textMain),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Cancel', style: TextStyle(color: AppTheme.textMuted))),
-          ElevatedButton(
-            onPressed: () async {
-              try {
-                await Supabase.instance.client.auth.resetPasswordForEmail(ctrl.text.trim());
-                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text('Reset link sent to your email'), backgroundColor: AppColors.greenPrimary));
-                Navigator.pop(ctx);
-              } catch (_) {}
-              Navigator.pop(ctx);
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.greenPrimary, foregroundColor: Colors.white),
-            child: const Text('Send'),
-          ),
-        ],
-      ),
-    );
+    Navigator.push(context, MaterialPageRoute(
+      builder: (_) => const ForgotPasswordScreen(),
+    ));
   }
 }

@@ -1,15 +1,29 @@
 import 'package:flutter/foundation.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:speech_to_text/speech_recognition_result.dart';
 
-/// Hold-to-talk voice input service.
-/// User holds mic button → listening starts → release → text auto-sends.
+/// Click-to-record voice input service.
+/// User taps mic → listening starts → taps again → text fills input.
+/// Supports English + Bengali (Roman script) recognition.
 class VoiceService {
   final SpeechToText _speech = SpeechToText();
   bool _initialized = false;
   bool _listening = false;
 
   bool get isListening => _listening;
+
+  /// Request microphone permission (Android 6+ requires runtime grant).
+  Future<bool> _ensurePermission() async {
+    try {
+      final status = await Permission.microphone.status;
+      if (status.isGranted) return true;
+      final result = await Permission.microphone.request();
+      return result.isGranted;
+    } catch (_) {
+      return false;
+    }
+  }
 
   /// Initialize speech recognition (call once at startup).
   Future<bool> initialize() async {
@@ -27,11 +41,16 @@ class VoiceService {
   }
 
   /// Start listening. Calls [onResult] with partial/final text.
-  /// User should call [stopListening] when they release the mic button.
   Future<void> startListening({
     required void Function(String text, bool isFinal) onResult,
   }) async {
     if (_listening) return;
+
+    final hasPerm = await _ensurePermission();
+    if (!hasPerm) {
+      onResult('', true);
+      return;
+    }
 
     final available = await initialize();
     if (!available) return;

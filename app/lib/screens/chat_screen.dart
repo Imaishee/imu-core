@@ -146,15 +146,32 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     } else {
       // Start recording
       setState(() { _isRecording = true; _voiceText = ''; });
+      var started = true;
       await _voiceService.startListening(
         onResult: (text, isFinal) {
-          setState(() => _voiceText = text);
-          if (isFinal && text.isNotEmpty) {
-            _inputController.text = text;
-            setState(() => _isRecording = false);
-          }
+          if (!mounted) return;
+          setState(() {
+            _voiceText = text;
+            if (isFinal && text.isNotEmpty) {
+              _inputController.text = text;
+              _isRecording = false;
+            }
+          });
         },
       );
+      // If permission was denied, startListening returns immediately empty
+      if (mounted && _isRecording) {
+        await Future.delayed(const Duration(milliseconds: 600));
+        if (_isRecording && !_voiceService.isListening && _voiceText.isEmpty) {
+          setState(() => _isRecording = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Microphone permission needed to use voice input'),
+              backgroundColor: Colors.redAccent,
+            ),
+          );
+        }
+      }
     }
   }
 
