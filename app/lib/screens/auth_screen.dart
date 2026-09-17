@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../theme/app_theme.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -12,205 +13,180 @@ class AuthScreen extends StatefulWidget {
 class _AuthScreenState extends State<AuthScreen> {
   bool _isLogin = true;
   bool _loading = false;
-  bool _isDark = true;
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
-  final _nameController = TextEditingController();
-  final _forgotEmailController = TextEditingController();
+  bool _obscure = true;
   String? _error;
 
-  @override
-  void initState() {
-    super.initState();
-    _loadTheme();
-  }
-
-  Future<void> _loadTheme() async {
-    final prefs = await SharedPreferences.getInstance();
-    if (mounted) setState(() => _isDark = prefs.getBool('dark_mode') ?? true);
-  }
-
-  Color get _bg => _isDark ? const Color(0xFF09090B) : const Color(0xFFF8F9FA);
-  Color get _cardBg => _isDark ? const Color(0xFF18181B) : Colors.white;
-  Color get _borderColor => _isDark ? const Color(0xFF27272A) : const Color(0xFFE5E7EB);
-  Color get _textPrimary => _isDark ? Colors.white : const Color(0xFF18181B);
-  Color get _textSecondary => _isDark ? Colors.white54 : const Color(0xFF71717A);
-  Color get _accent => _isDark ? const Color(0xFFA78BFA) : const Color(0xFF7C3AED);
+  final _emailCtrl = TextEditingController();
+  final _passCtrl = TextEditingController();
+  final _nameCtrl = TextEditingController();
+  final _universityCtrl = TextEditingController();
+  final _programmeCtrl = TextEditingController();
+  final _majorCtrl = TextEditingController();
+  final _minorCtrl = TextEditingController();
+  int _year = 1;
+  int _semester = 1;
 
   Future<void> _submit() async {
+    if (_emailCtrl.text.trim().isEmpty || _passCtrl.text.isEmpty) {
+      setState(() => _error = 'Please fill in email and password');
+      return;
+    }
+    if (!_isLogin && _nameCtrl.text.trim().isEmpty) {
+      setState(() => _error = 'Please enter your name');
+      return;
+    }
+
     setState(() { _loading = true; _error = null; });
     try {
-      final supabase = Supabase.instance.client;
+      final client = Supabase.instance.client;
       if (_isLogin) {
-        final resp = await supabase.auth.signInWithPassword(
-          email: _emailController.text.trim(),
-          password: _passwordController.text,
+        final resp = await client.auth.signInWithPassword(
+          email: _emailCtrl.text.trim(),
+          password: _passCtrl.text,
         );
         if (resp.user != null && mounted) {
           Navigator.pushReplacementNamed(context, '/home');
         }
       } else {
-        final resp = await supabase.auth.signUp(
-          email: _emailController.text.trim(),
-          password: _passwordController.text,
-          data: {'full_name': _nameController.text.trim()},
+        final resp = await client.auth.signUp(
+          email: _emailCtrl.text.trim(),
+          password: _passCtrl.text,
+          data: {
+            'full_name': _nameCtrl.text.trim(),
+            'university': _universityCtrl.text.trim(),
+            'programme': _programmeCtrl.text.trim(),
+            'year': _year.toString(),
+            'semester': _semester.toString(),
+            'major': _majorCtrl.text.trim(),
+            'minor': _minorCtrl.text.trim(),
+          },
         );
         if (resp.user != null && mounted) {
           if (resp.user!.emailConfirmedAt != null) {
             Navigator.pushReplacementNamed(context, '/home');
           } else {
-            setState(() => _error = 'Check your email to confirm your account');
+            setState(() => _error = 'Check your email — click the confirmation link to activate your account. The link goes to our secure site now.');
           }
         }
       }
     } on AuthException catch (e) {
       setState(() => _error = e.message);
     } catch (e) {
-      setState(() => _error = 'Something went wrong. Try again.');
+      setState(() => _error = 'Something went wrong. Please try again.');
     }
     if (mounted) setState(() => _loading = false);
-  }
-
-  void _showForgotPassword() {
-    _forgotEmailController.text = _emailController.text.trim();
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: _cardBg,
-        title: Text('Reset Password', style: TextStyle(color: _textPrimary)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('Enter your email to receive a reset link.', style: TextStyle(color: _textSecondary, fontSize: 13)),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _forgotEmailController,
-              decoration: InputDecoration(
-                hintText: 'Email',
-                hintStyle: TextStyle(color: _textSecondary),
-                border: OutlineInputBorder(borderSide: BorderSide(color: _borderColor)),
-                enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: _borderColor)),
-              ),
-              style: TextStyle(color: _textPrimary),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Cancel', style: TextStyle(color: _textSecondary))),
-          TextButton(
-            onPressed: () async {
-              try {
-                await Supabase.instance.client.auth.resetPasswordForEmail(
-                  _forgotEmailController.text.trim(),
-                );
-                if (mounted) {
-                  Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Reset link sent to your email'), backgroundColor: _accent),
-                  );
-                }
-              } catch (e) {
-                if (mounted) Navigator.pop(ctx);
-              }
-            },
-            child: Text('Send Reset Link', style: TextStyle(color: _accent)),
-          ),
-        ],
-      ),
-    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _bg,
+      backgroundColor: AppTheme.bg,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 32),
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                const SizedBox(height: 20),
                 Container(
-                  width: 72, height: 72,
+                  width: 74,
+                  height: 74,
                   decoration: BoxDecoration(
-                    color: _accent,
-                    borderRadius: BorderRadius.circular(20),
+                    gradient: const LinearGradient(colors: [AppColors.greenPrimary, AppColors.greenLight], begin: Alignment.topLeft, end: Alignment.bottomRight),
+                    borderRadius: BorderRadius.circular(22),
                   ),
-                  child: Center(
-                    child: Text('IM', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 22)),
-                  ),
+                  child: const Center(child: Text('IM', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 24))),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 20),
                 Text(
-                  _isLogin ? "Welcome Back" : "Create Account",
-                  style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: _textPrimary),
+                  _isLogin ? 'Welcome back' : 'Create account',
+                  style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: AppTheme.textMain),
+                  textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  _isLogin ? "Sign in to continue" : "Sign up to get started",
-                  style: TextStyle(color: _textSecondary, fontSize: 15),
+                  _isLogin ? 'Sign in to continue' : "Let's set up your profile",
+                  style: TextStyle(color: AppTheme.textMuted, fontSize: 15),
+                  textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 40),
+                const SizedBox(height: 32),
 
-                if (!_isLogin) ...[
-                  _buildInput(_nameController, 'Full Name', Icons.person_outline),
-                  const SizedBox(height: 16),
-                ],
-                _buildInput(_emailController, 'Email', Icons.email_outlined),
-                const SizedBox(height: 16),
-                _buildInput(_passwordController, 'Password', Icons.lock_outline, obscure: true),
-                const SizedBox(height: 8),
+                if (!_isLogin)
+                  _field(_nameCtrl, 'Full Name', Icons.person_outline),
+
+                _field(_emailCtrl, 'Email', Icons.email_outlined, keyboardType: TextInputType.emailAddress),
+                const SizedBox(height: 14),
+                _field(_passCtrl, 'Password', Icons.lock_outline, obscure: _obscure),
 
                 if (_isLogin)
                   Align(
                     alignment: Alignment.centerRight,
                     child: TextButton(
-                      onPressed: _showForgotPassword,
-                      child: Text('Forgot Password?', style: TextStyle(color: _accent, fontSize: 13)),
+                      onPressed: () => _showForgotPassword(),
+                      child: Text('Forgot Password?', style: TextStyle(color: AppColors.greenLight, fontSize: 13)),
                     ),
                   ),
+
+                if (!_isLogin) ...[
+                  const SizedBox(height: 14),
+                  _field(_universityCtrl, 'University', Icons.school_outlined),
+                  const SizedBox(height: 14),
+                  _field(_programmeCtrl, 'Programme / Department', Icons.class_outlined),
+                  const SizedBox(height: 14),
+                  Row(children: [
+                    Expanded(child: _dropdown('Year', _year, [1, 2, 3, 4], (v) => setState(() => _year = v!))),
+                    const SizedBox(width: 12),
+                    Expanded(child: _dropdown('Semester', _semester, [1, 2, 3, 4, 5, 6], (v) => setState(() => _semester = v!))),
+                  ]),
+                  const SizedBox(height: 14),
+                  Row(children: [
+                    Expanded(child: _field(_majorCtrl, 'Major', Icons.menu_book_outlined)),
+                    const SizedBox(width: 12),
+                    Expanded(child: _field(_minorCtrl, 'Minor (optional)', Icons.more_horiz)),
+                  ]),
+                ],
 
                 if (_error != null)
                   Container(
-                    margin: const EdgeInsets.only(bottom: 16),
+                    margin: const EdgeInsets.only(top: 14),
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.red.withAlpha(20),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.red.withAlpha(50)),
+                      color: Colors.red.shade50,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.red.shade200),
                     ),
-                    child: Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 13)),
+                    child: Text(_error!, style: TextStyle(color: Colors.red.shade700, fontSize: 13)),
                   ),
 
-                const SizedBox(height: 8),
+                const SizedBox(height: 24),
                 SizedBox(
-                  width: double.infinity, height: 52,
+                  height: 52,
                   child: ElevatedButton(
                     onPressed: _loading ? null : _submit,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: _accent,
+                      backgroundColor: AppColors.greenPrimary,
                       foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      disabledBackgroundColor: _accent.withAlpha(128),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                     ),
                     child: _loading
                         ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                        : Text(_isLogin ? 'Sign In' : 'Sign Up', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+                        : Text(_isLogin ? 'Sign In' : 'Create Account', style: const TextStyle(fontWeight: FontWeight.w600)),
                   ),
                 ),
-                const SizedBox(height: 24),
 
+                const SizedBox(height: 18),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text(_isLogin ? "Don't have an account? " : "Already have an account? ", style: TextStyle(color: _textSecondary, fontSize: 14)),
+                    Text(_isLogin ? "Don't have an account? " : 'Already have an account? ', style: TextStyle(color: AppTheme.textMuted)),
                     GestureDetector(
                       onTap: () => setState(() { _isLogin = !_isLogin; _error = null; }),
-                      child: Text(_isLogin ? 'Sign Up' : 'Sign In', style: TextStyle(color: _accent, fontWeight: FontWeight.w600, fontSize: 14)),
+                      child: Text(_isLogin ? 'Sign Up' : 'Sign In', style: TextStyle(color: AppColors.greenPrimary, fontWeight: FontWeight.w600)),
                     ),
                   ],
                 ),
+                const SizedBox(height: 20),
               ],
             ),
           ),
@@ -219,20 +195,75 @@ class _AuthScreenState extends State<AuthScreen> {
     );
   }
 
-  Widget _buildInput(TextEditingController ctrl, String hint, IconData icon, {bool obscure = false}) {
+  Widget _field(TextEditingController ctrl, String hint, IconData icon, {int maxLines = 1, bool obscure = false, TextInputType keyboardType = TextInputType.text}) {
     return TextField(
       controller: ctrl,
       obscureText: obscure,
+      maxLines: obscure ? 1 : maxLines,
+      keyboardType: keyboardType,
+      style: TextStyle(color: AppTheme.textMain, fontSize: 14),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: TextStyle(color: _textSecondary),
-        prefixIcon: Icon(icon, color: _textSecondary, size: 20),
-        border: OutlineInputBorder(borderSide: BorderSide(color: _borderColor), borderRadius: BorderRadius.circular(12)),
-        enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: _borderColor), borderRadius: BorderRadius.circular(12)),
-        focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: _accent), borderRadius: BorderRadius.circular(12)),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        hintStyle: TextStyle(color: AppTheme.textMuted),
+        prefixIcon: Icon(icon, color: AppColors.greenMedium, size: 20),
+        suffixIcon: obscure == _obscure && ctrl == _passCtrl
+            ? IconButton(icon: Icon(_obscure ? Icons.visibility_off_outlined : Icons.visibility_outlined, color: AppTheme.textMuted), onPressed: () => setState(() => _obscure = !_obscure))
+            : null,
+        filled: true,
+        fillColor: AppTheme.surface,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: AppTheme.border)),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: AppTheme.border)),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: AppColors.greenLight, width: 1.4)),
       ),
-      style: TextStyle(color: _textPrimary, fontSize: 14),
+    );
+  }
+
+  Widget _dropdown(String label, int value, List<int> values, Function(int?) onChanged) {
+    return Container(
+      decoration: BoxDecoration(color: AppTheme.surface, borderRadius: BorderRadius.circular(14), border: Border.all(color: AppTheme.border)),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<int>(
+          value: value,
+          isExpanded: true,
+          dropdownColor: AppTheme.surface,
+          style: TextStyle(color: AppTheme.textMain, fontSize: 13),
+          icon: Icon(Icons.keyboard_arrow_down, color: AppTheme.textMuted),
+          items: values.map((v) => DropdownMenuItem(value: v, child: Text('$label $v'))).toList(),
+          onChanged: onChanged,
+        ),
+      ),
+    );
+  }
+
+  void _showForgotPassword() {
+    final ctrl = TextEditingController(text: _emailCtrl.text.trim());
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.surface,
+        title: Text('Reset Password', style: TextStyle(color: AppTheme.textMain)),
+        content: TextField(
+          controller: ctrl,
+          decoration: InputDecoration(hintText: 'Your email', prefixIcon: Icon(Icons.email_outlined, color: AppColors.greenMedium), filled: true, fillColor: AppTheme.surface),
+          style: TextStyle(color: AppTheme.textMain),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Cancel', style: TextStyle(color: AppTheme.textMuted))),
+          ElevatedButton(
+            onPressed: () async {
+              try {
+                await Supabase.instance.client.auth.resetPasswordForEmail(ctrl.text.trim());
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text('Reset link sent to your email'), backgroundColor: AppColors.greenPrimary));
+                Navigator.pop(ctx);
+              } catch (_) {}
+              Navigator.pop(ctx);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.greenPrimary, foregroundColor: Colors.white),
+            child: const Text('Send'),
+          ),
+        ],
+      ),
     );
   }
 }

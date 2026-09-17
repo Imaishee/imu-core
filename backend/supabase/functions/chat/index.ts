@@ -6,6 +6,66 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Emit a status event the client can show as "thinking" — SSE-safe
+function status(step: string, detail?: string) {
+  return `data: ${JSON.stringify({ type: "status", step, detail })}\n\n`;
+}
+
+// Detect if a message likely needs web search
+function needsWebSearch(text: string): boolean {
+  const lower = text.toLowerCase();
+  const keywords = [
+    "latest", "news", "today", "current", "price", "weather", "who is", "who won",
+    "recent", "search", "find", "look up", "what happened", "when did",
+    "stock", "score", "result", "update on", "tell me about", "do you know about",
+    "what are", "how much", "view on", "trending", "best", "top", "review",
+    "compare", "cost", "rates", "exchange", "crypto", "bitcoin", "recipe",
+  ];
+  return keywords.some(kw => lower.includes(kw));
+}
+
+// Simple free DuckDuckGo instant answer + search results
+async function webSearch(query: string): Promise<string> {
+  try {
+    const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
+    const ctrl = new AbortController();
+    const timeout = setTimeout(() => ctrl.abort(), 8000);
+    const resp = await fetch(url, {
+      headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" },
+      signal: ctrl.signal,
+    });
+    clearTimeout(timeout);
+    if (!resp.ok) return "";
+    const html = await resp.text();
+
+    // Extract result titles + snippets
+    const results: string[] = [];
+    // DuckDuckGo html format: <a class="result__a" ...>title</a> ... <a class="result__snippet">snippet</a>
+    const aMatches = html.match(/<a[^>]*class="result__a"[^>]*>([\s\S]*?)<\/a>/g) || [];
+    const sMatches = html.match(/<a[^>]*class="result__snippet"[^>]*>([\s\S]*?)<\/a>/g) || [];
+
+    for (let i = 0; i < Math.min(aMatches.length, 5); i++) {
+      const title = aMatches[i].replace(/<[^>]+>/g, "").trim();
+      const snippet = sMatches[i] ? sMatches[i].replace(/<[^>]+>/g, "").trim() : "";
+      results.push(`${i + 1}. ${title}\n${snippet}`);
+    }
+    return results.join("\n\n");
+  } catch (e) {
+    return "";
+  }
+}
+
+// Simple webpage text extraction (for when user pastes a URL or for search results)
+function stripHtml(html: string): string {
+  return html
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .substring(0, 2000); // keep context window sensible
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -18,8 +78,9 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Try to get user from auth header, but don't require it
+    // Auth — optional user context
     let userId: string | null = null;
+    let userProfile: any = null;
     const authHeader = req.headers.get("Authorization");
     if (authHeader) {
       try {
@@ -41,9 +102,24 @@ serve(async (req) => {
       .eq("name", "default")
       .single();
 
-    const systemPrompt = promptData?.prompt || "You are IM'U, a helpful AI study assistant.";
+    const basePrompt = promptData?.prompt || "You are IM'U, a helpful AI study assistant.";
 
-    // Fetch user knowledge graph context if user is authenticated
+    // User profile context when authenticated
+    let profileContext = "";
+    if (userId) {
+      try {
+        const { data: prof } = await supabase
+          .from("profiles")
+          .select("name, programme, year, semester, major, minor, university")
+          .eq("id", userId)
+          .single();
+        if (prof) {
+          profileContext = `\n\nUser Profile:\n- Name: ${prof.name}\n- University: ${prof.university}\n- Programme: ${prof.programme}\n- Year: ${prof.year}, Semester: ${prof.semester}\n- Major: ${prof.major}, Minor: ${prof.minor}\n\nAddress them by name when natural. Reference their studies when relevant.`;
+        }
+      } catch {}
+    }
+
+    // Knowledge graph context
     let knowledgeContext = "";
     if (userId) {
       const { data: knowledgeNodes } = await supabase
@@ -54,47 +130,98 @@ serve(async (req) => {
         .limit(20);
 
       if (knowledgeNodes && knowledgeNodes.length > 0) {
-        knowledgeContext = "\n\nUser Knowledge Context:\n" +
+        knowledgeContext = "\n\nUser Knowledge:\n" +
           knowledgeNodes.map((n: any) => `- ${n.label} (${n.node_type}): ${n.content || "no details"}`).join("\n");
       }
     }
 
-    const apiMessages = [
-      { role: "system", content: systemPrompt + knowledgeContext },
-      ...messages.map((m: any) => ({ role: m.role, content: m.content })),
-    ];
+    let systemPrompt = basePrompt + profileContext + knowledgeContext;
 
-    // Call Groq API
+    // =========== WEB SEARCH LOGIC ===========
+    const lastUserMsg = messages[messages.length - 1];
+    const msgText = lastUserMsg?.content?.toString() || "";
+    let webContext = "";
+    const statusSteps: Array<{ step: string; detail?: string }> = [];
+
+    // Check if any message contains a URL the user wants analyzed
+    const urls = msgText.match(/https?:\/\/[^\s]+/g);
+    if (urls && urls.length > 0) {
+      for (const url of urls.slice(0, 3)) {
+        try {
+          statusSteps.push({ step: "scraping", detail: url });
+          const scrapeResp = await fetch(url, {
+            headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" },
+            signal: AbortSignal.timeout(8000),
+          });
+          if (scrapeResp.ok) {
+            const html = await scrapeResp.text();
+            const text = stripHtml(html);
+            if (text.length > 100) {
+              webContext += `\n\nWeb content from ${url}:\n${text}\n`;
+            }
+          }
+        } catch {}
+      }
+    }
+
+    // Web search if the user is asking about current/factual things
+    if (needsWebSearch(msgText)) {
+      statusSteps.push({ step: "thinking" });
+      statusSteps.push({ step: "searching", detail: msgText.substring(0, 80) });
+      const results = await webSearch(msgText);
+      if (results) {
+        const sources = results.split("\n\n").map(r => {
+          const m = r.match(/^\d+\.\s*(.+)/);
+          return m ? m[1] : "";
+        }).filter(Boolean).slice(0, 3);
+        statusSteps.push({ step: "search_done", detail: `${sources.length} sources found` });
+        webContext += `\n\nWeb Search Results:\n${results}\n\nUse these sources to answer accurately. Cite which source provides each fact (e.g., "According to Source 1...").`;
+      }
+    }
+
+    if (webContext) {
+      systemPrompt += `\n\n=== WEB CONTEXT ===${webContext}\n\nIMPORTANT: If you used web sources, say where information came from. Do not make up sources.`;
+    }
+    // ========================================
+
+    // Call Groq
+    const groqBody = {
+      model,
+      messages: [
+        { role: "system", content: systemPrompt },
+        ...messages.map((m: any) => ({ role: m.role, content: m.content })),
+      ],
+      stream: true,
+      max_tokens: 2048,
+      temperature: 0.75,
+    };
+
     const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
-      headers: {
-        "Authorization": `Bearer ${groqApiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        messages: apiMessages,
-        stream: true,
-        max_tokens: 2048,
-        temperature: 0.7,
-      }),
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${groqApiKey}` },
+      body: JSON.stringify(groqBody),
     });
 
     if (!response.ok) {
       const err = await response.text();
-      console.error("Groq API error:", err);
       return new Response(JSON.stringify({ error: err }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Stream SSE back to client
     const reader = response.body!.getReader();
     const decoder = new TextDecoder();
+    const encoder = new TextEncoder();
 
     const stream = new ReadableStream({
       async start(controller) {
+        // Send thinking/status events BEFORE the content
+        for (const notif of statusSteps) {
+          controller.enqueue(encoder.encode(status(notif.step, notif.detail)));
+          await new Promise(r => setTimeout(r, 200)); // slight delay so it feels like thinking
+        }
+
         let fullContent = "";
         let buffer = "";
 
@@ -111,22 +238,16 @@ serve(async (req) => {
             if (line.startsWith("data: ")) {
               const data = line.slice(6).trim();
               if (data === "[DONE]") {
-                // Save to database if user is authenticated
+                // Save to DB
                 if (conversation_id && fullContent && userId) {
-                  const lastUserMsg = messages[messages.length - 1];
                   await supabase.from("messages").insert({
-                    conversation_id,
-                    role: "user",
-                    content: lastUserMsg.content,
+                    conversation_id, role: "user", content: msgText,
                   });
                   await supabase.from("messages").insert({
-                    conversation_id,
-                    role: "assistant",
-                    content: fullContent,
-                    model,
+                    conversation_id, role: "assistant", content: fullContent, model,
                   });
                 }
-                controller.enqueue(new TextEncoder().encode("data: [DONE]\n\n"));
+                controller.enqueue(encoder.encode("data: [DONE]\n\n"));
                 controller.close();
                 return;
               }
@@ -135,7 +256,7 @@ serve(async (req) => {
                 const content = parsed.choices?.[0]?.delta?.content || "";
                 if (content) {
                   fullContent += content;
-                  controller.enqueue(new TextEncoder().encode(`data: ${data}\n\n`));
+                  controller.enqueue(encoder.encode(`data: ${data}\n\n`));
                 }
               } catch {}
             }
@@ -153,7 +274,6 @@ serve(async (req) => {
       },
     });
   } catch (error) {
-    console.error("Function error:", error);
     return new Response(JSON.stringify({ error: String(error) }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },

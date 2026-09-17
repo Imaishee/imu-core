@@ -1,33 +1,37 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../models/conversation.dart';
 import '../models/chat_message.dart';
+import '../models/conversation.dart';
 import '../services/chat_service.dart';
 import '../services/local_storage.dart';
 
 final chatServiceProvider = Provider((ref) => ChatService());
 final localStorageProvider = Provider((ref) => LocalStorage());
 
-// Conversations
-final conversationsProvider = NotifierProvider<ConversationsNotifier, List<Conversation>>(
-  ConversationsNotifier.new,
-);
+// Conversations list
+final conversationsProvider =
+    NotifierProvider<ConversationsNotifier, List<Conversation>>(
+        ConversationsNotifier.new);
 
-// Active conversation ID (using Notifier instead of StateProvider)
-final activeConversationProvider = NotifierProvider<ActiveConversationNotifier, String?>(
-  ActiveConversationNotifier.new,
-);
+// Active conversation id
+final activeConversationProvider =
+    NotifierProvider<ActiveConversationNotifier, String?>(
+        ActiveConversationNotifier.new);
 
-class ActiveConversationNotifier extends Notifier<String?> {
+// Messages by conversation
+final messagesProvider =
+    NotifierProvider.family<MessagesNotifier, List<ChatMessage>, String>(
+        MessagesNotifier.new);
+
+// Thinking/search status shown while AI is working
+final thinkingStatusProvider =
+    NotifierProvider<ThinkingStatusNotifier, String?>(ThinkingStatusNotifier.new);
+
+class ThinkingStatusNotifier extends Notifier<String?> {
   @override
   String? build() => null;
 
-  void set(String? id) => state = id;
+  void set(String? value) => state = value;
 }
-
-// Messages per conversation (family via constructor)
-final messagesProvider = NotifierProvider.family<MessagesNotifier, List<ChatMessage>, String>(
-  MessagesNotifier.new,
-);
 
 class ConversationsNotifier extends Notifier<List<Conversation>> {
   @override
@@ -37,11 +41,10 @@ class ConversationsNotifier extends Notifier<List<Conversation>> {
   }
 
   Future<void> _load() async {
-    final local = await ref.read(localStorageProvider).loadConversations();
-    state = local;
+    state = await ref.read(localStorageProvider).loadConversations();
   }
 
-  Conversation createChat() {
+  Conversation create() {
     final convo = Conversation(
       remoteId: DateTime.now().millisecondsSinceEpoch.toString(),
       title: 'New Chat',
@@ -51,36 +54,34 @@ class ConversationsNotifier extends Notifier<List<Conversation>> {
     return convo;
   }
 
-  void updateTitle(String remoteId, String title) {
-    state = [
-      for (final c in state)
-        if (c.remoteId == remoteId)
-          Conversation(
-            remoteId: c.remoteId,
-            title: title,
-            model: c.model,
-            createdAt: c.createdAt,
-            updatedAt: DateTime.now(),
-          )
-        else
-          c
-    ];
+  void updateTitle(String id, String title) {
+    for (final c in state) {
+      if (c.remoteId == id) {
+        c.title = title;
+        c.updatedAt = DateTime.now();
+      }
+    }
     _save();
   }
 
-  void deleteChat(String remoteId) {
-    state = state.where((c) => c.remoteId != remoteId).toList();
+  void delete(String id) {
+    state = state.where((c) => c.remoteId != id).toList();
     _save();
   }
 
-  void _save() {
-    ref.read(localStorageProvider).saveConversations(state);
-  }
+  void _save() =>
+      ref.read(localStorageProvider).saveConversations(state);
+}
+
+class ActiveConversationNotifier extends Notifier<String?> {
+  @override
+  String? build() => null;
+  void set(String? id) => state = id;
 }
 
 class MessagesNotifier extends Notifier<List<ChatMessage>> {
-  MessagesNotifier(this._convoId);
-  final String _convoId;
+  MessagesNotifier(this._conversationId);
+  final String _conversationId;
 
   @override
   List<ChatMessage> build() {
@@ -89,34 +90,100 @@ class MessagesNotifier extends Notifier<List<ChatMessage>> {
   }
 
   Future<void> _load() async {
-    final local = await ref.read(localStorageProvider).loadMessages(_convoId);
-    state = local;
+    state = await ref.read(localStorageProvider).loadMessages(_conversationId);
+  }
+
+  String _autoTitle(String content) {
+    final words = content.trim().split(RegExp(r'\s+'));
+    if (words.length <= 6) return content.trim();
+    return words.sublist(0, 6).join(' ') + '…';
   }
 
   Future<void> sendMessage(String content) async {
-    final userMsg = ChatMessage(conversationId: _convoId, role: 'user', content: content);
+    if (content.trim().isEmpty) return;
+
+    final convoNotifier = ref.read(conversationsProvider.notifier);
+
+    // Add user message
+    final userMsg = ChatMessage(
+      conversationId: _conversationId,
+      role: 'user',
+      content: content,
+    );
     state = [...state, userMsg];
 
-    final assistantMsg = ChatMessage(conversationId: _convoId, role: 'assistant', content: '');
-    state = [...state, assistantMsg];
-
-    final apiMessages = state
-        .where((m) => m.role != 'system' && m.content.isNotEmpty)
-        .map((m) => {'role': m.role, 'content': m.content})
-        .toList();
-
-    String fullContent = '';
-    await for (final chunk in ref.read(chatServiceProvider).streamChat(
-      messages: apiMessages.map((m) => {'role': m['role']!, 'content': m['content']!}).toList(),
-      conversationId: _convoId,
-    )) {
-      fullContent += chunk;
-      state = [
-        ...state.sublist(0, state.length - 1),
-        ChatMessage(conversationId: _convoId, role: 'assistant', content: fullContent),
-      ];
+    // Auto-title if this is first real message (no assistant content yet)
+    final hasAssistant = state.any((m) => m.role == 'assistant');
+    if (!hasAssistant) {
+      convoNotifier.updateTitle(_conversationId, _autoTitle(content));
     }
 
-    ref.read(localStorageProvider).saveMessages(_convoId, state);
+    ref.read(thinkingStatusProvider.notifier).state = 'Thinking…';
+
+    try {
+      final apiMessages = state
+          .where((m) => (m.role == 'user' || m.role == 'assistant') && m.content.isNotEmpty)
+          .map((m) => {'role': m.role, 'content': m.content})
+          .toList();
+
+      String fullContent = '';
+      await for (final event in ref
+          .read(chatServiceProvider)
+          .streamChat(messages: apiMessages, conversationId: _conversationId)) {
+        final type = event['type'];
+
+        if (type == 'status') {
+          // Show thinking/search etc. above the message
+          final step = event['step'] ?? 'working';
+          final detail = event['detail'] ?? '';
+          ref.read(thinkingStatusProvider.notifier).state =
+              '${step == 'searching' ? '🔍 Searching' : step == 'thinking' ? '🧠 Thinking' : step == 'scraping' ? '🌐 Reading page' : '⚙️ Working'}' +
+              (detail.isNotEmpty ? ' — $detail' : '');
+        } else if (type == 'chunk') {
+          final text = event['text'] as String;
+          if (text.isNotEmpty) {
+            if (state.isNotEmpty && state.last.role == 'assistant') {
+              final last = state.last;
+              state = [
+                ...state.sublist(0, state.length - 1),
+                ChatMessage(
+                  conversationId: _conversationId,
+                  role: 'assistant',
+                  content: last.content + text,
+                ),
+              ];
+            } else {
+              state = [
+                ...state,
+                ChatMessage(
+                  conversationId: _conversationId,
+                  role: 'assistant',
+                  content: text,
+                ),
+              ];
+            }
+            fullContent += text;
+          }
+        }
+      }
+    } catch (e) {
+      // Replace any partial assistant content
+      if (state.isNotEmpty && state.last.role == 'assistant') {
+        final last = state.last;
+        state = [
+          ...state.sublist(0, state.length - 1),
+          ChatMessage(
+            conversationId: _conversationId,
+            role: 'assistant',
+            content: last.content.isEmpty ? 'Something went wrong. Please try again.' : last.content,
+          ),
+        ];
+      }
+    } finally {
+      ref.read(thinkingStatusProvider.notifier).state = null;
+    }
+
+    // Save after streaming finishes
+    ref.read(localStorageProvider).saveMessages(_conversationId, state);
   }
 }

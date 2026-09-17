@@ -4,92 +4,75 @@ import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../constants/app_constants.dart';
 
-class ChatService {
-  final String _baseUrl = AppConstants.supabaseUrl;
+class ChatStatus {
+  final String step;
+  final String? detail;
+  const ChatStatus(this.step, {this.detail});
 
-  String? _getToken() {
-    return Supabase.instance.client.auth.currentSession?.accessToken;
+  String get label {
+    switch (step) {
+      case 'thinking':
+        return 'Thinking…';
+      case 'searching':
+        return 'Searching the web…';
+      case 'search_done':
+        return detail ?? 'Found sources';
+      case 'scraping':
+        return 'Reading webpage…';
+      default:
+        return step;
+    }
   }
+}
 
-  String _getAnonKey() => AppConstants.supabaseAnonKey;
+class ChatService {
+  static const _timeout = Duration(seconds: 120);
 
-  Stream<String> streamChat({
+  /// Streams events: {'type':'status','step','detail'} and {'type':'chunk','text'}.
+  Stream<Map<String, dynamic>> streamChat({
     required List<Map<String, String>> messages,
     String? conversationId,
-    String model = AppConstants.defaultModel,
   }) async* {
-    final token = _getToken() ?? _getAnonKey();
-    final url = Uri.parse('$_baseUrl${AppConstants.chatEndpoint}');
-
-    final request = http.Request('POST', url);
-    request.headers.addAll({
+    final headers = <String, String>{
       'Content-Type': 'application/json',
-      'Authorization': 'Bearer $token',
-      'apikey': _getAnonKey(),
-    });
+      'apikey': AppConstants.supabaseAnonKey,
+    };
+
+    final session = Supabase.instance.client.auth.currentSession;
+    if (session != null) {
+      headers['Authorization'] = 'Bearer ${session.accessToken}';
+    }
+
+    final request = http.Request(
+      'POST',
+      Uri.parse('https://cxiicvirllfdvcjwwcbj.supabase.co/functions/v1/chat'),
+    );
+    request.headers.addAll(headers);
     request.body = jsonEncode({
       'messages': messages,
-      'conversation_id': conversationId,
-      'model': model,
+      if (conversationId != null) 'conversation_id': conversationId,
+      'model': AppConstants.defaultModel,
     });
 
-    final response = await http.Client().send(request);
+    final response = await http.Client().send(request).timeout(_timeout);
+    final utf8Stream = response.stream.transform(const Utf8Decoder());
+    final lineStream = utf8Stream.transform(const LineSplitter());
 
-    if (response.statusCode != 200) {
-      final body = await response.stream.bytesToString();
-      throw Exception('Chat failed (${response.statusCode}): $body');
-    }
-
-    String buffer = '';
-    await for (final chunk in response.stream.transform(utf8.decoder)) {
-      buffer += chunk;
-      final lines = buffer.split('\n');
-      buffer = lines.removeLast();
-
-      for (final line in lines) {
-        if (line.startsWith('data: ')) {
-          final data = line.substring(6).trim();
-          if (data == '[DONE]') return;
-
-          try {
-            final parsed = jsonDecode(data);
-            final content = parsed['choices']?[0]?['delta']?['content'];
-            if (content != null && content is String) {
-              yield content;
-            }
-          } catch (_) {}
+    await for (final line in lineStream) {
+      if (!line.startsWith('data: ')) continue;
+      final payload = line.substring(6).trim();
+      if (payload.isEmpty || payload == '[DONE]') break;
+      try {
+        final data = jsonDecode(payload);
+        if (data is Map<String, dynamic> && data['type'] == 'status') {
+          yield {'type': 'status', 'step': data['step'], 'detail': data['detail']};
+        } else {
+          final content = data['choices']?[0]?['delta']?['content'];
+          if (content != null && content.isNotEmpty) {
+            yield {'type': 'chunk', 'text': content};
+          }
         }
-      }
+      } catch (_) {}
     }
-  }
-
-  Future<List<Map<String, dynamic>>> getConversations(String userId) async {
-    final token = _getToken() ?? _getAnonKey();
-    final url = Uri.parse('$_baseUrl/rest/v1/conversations?user_id=eq.$userId&order=updated_at.desc');
-
-    final response = await http.get(url, headers: {
-      'Authorization': 'Bearer $token',
-      'apikey': _getAnonKey(),
-    });
-
-    if (response.statusCode == 200) {
-      return List<Map<String, dynamic>>.from(jsonDecode(response.body));
-    }
-    return [];
-  }
-
-  Future<List<Map<String, dynamic>>> getMessages(String conversationId) async {
-    final token = _getToken() ?? _getAnonKey();
-    final url = Uri.parse('$_baseUrl/rest/v1/messages?conversation_id=eq.$conversationId&order=created_at.asc');
-
-    final response = await http.get(url, headers: {
-      'Authorization': 'Bearer $token',
-      'apikey': _getAnonKey(),
-    });
-
-    if (response.statusCode == 200) {
-      return List<Map<String, dynamic>>.from(jsonDecode(response.body));
-    }
-    return [];
   }
 }
