@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../constants/app_constants.dart';
-import '../services/permission_service.dart';
 import '../theme/app_theme.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -270,7 +268,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
 
             // ── Permissions
-            _section('Permissions &#x26; About'),
+            _section('Permissions & About'),
             GlassCard(
               padding: EdgeInsets.zero,
               child: Column(
@@ -285,12 +283,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     leading: Icon(Icons.system_update_alt, color: AppColors.greenMedium),
                     title: Text('Check for Updates', style: TextStyle(color: AppTheme.textMain)),
                     subtitle: Text('Current: v${AppConstants.appVersion}', style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
-                    trailing: Row(children: [
-                      _checkingUpdate
-                          ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                          : const Icon(Icons.chevron_right),
-                      const SizedBox(width: 4),
-                    ]),
+                    trailing: _checkingUpdate
+                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                        : Icon(Icons.chevron_right, color: AppTheme.textMuted),
                     onTap: _checkingUpdate ? null : _checkUpdate,
                   ),
                 ],
@@ -306,15 +301,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ListTile(
                     leading: Icon(Icons.privacy_tip_outlined, color: AppColors.greenMedium),
                     title: Text('Privacy Policy', style: TextStyle(color: AppTheme.textMain)),
-                    trailing: const Icon(Icons.open_in_new, size: 16),
-                    onTap: () => _openUrl('https://imu-admin.vercel.app/privacy'),
+                    trailing: Icon(Icons.chevron_right, color: AppTheme.textMuted),
+                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const _LegalScreen(type: 'privacy'))),
                   ),
                   Divider(color: AppTheme.border, height: 1),
                   ListTile(
                     leading: Icon(Icons.description_outlined, color: AppColors.greenMedium),
                     title: Text('Terms of Service', style: TextStyle(color: AppTheme.textMain)),
-                    trailing: const Icon(Icons.open_in_new, size: 16),
-                    onTap: () => _openUrl('https://imu-admin.vercel.app/terms'),
+                    trailing: Icon(Icons.chevron_right, color: AppTheme.textMuted),
+                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const _LegalScreen(type: 'terms'))),
                   ),
                 ],
               ),
@@ -424,9 +419,78 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  void _openUrl(String url) async {
-    try {
-      await launchUrl(Uri.parse(url));
-    } catch (_) {}
+}
+
+class _LegalScreen extends StatelessWidget {
+  final String type;
+  const _LegalScreen({required this.type});
+
+  @override
+  Widget build(BuildContext context) {
+    final isPrivacy = type == 'privacy';
+    return Scaffold(
+      backgroundColor: AppTheme.bg,
+      appBar: AppBar(
+        backgroundColor: AppTheme.bg,
+        title: Text(isPrivacy ? 'Privacy Policy' : 'Terms of Service',
+            style: TextStyle(color: AppTheme.textMain, fontWeight: FontWeight.w700)),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        children: [
+          GlassCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isPrivacy ? 'Privacy Policy' : 'Terms of Service',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: AppTheme.textMain),
+                ),
+                const SizedBox(height: 6),
+                Text('Last updated: September 2026', style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
+                const SizedBox(height: 16),
+                if (isPrivacy) ...[
+                  _legalSection('1. Information We Collect',
+                    'We collect your name, email, university details, timetable, alarms, chat history, and device token for push notifications. We may collect your location when you grant permission.'),
+                  _legalSection('2. How We Use Your Information',
+                    'Your data is used to provide and improve I\'MU\'s features: scheduling, reminders, AI study assistance, and push notifications. We do not sell or share your personal data with third parties.'),
+                  _legalSection('3. Data Storage',
+                    'Your data is stored securely on Supabase (PostgreSQL) with row-level security. Chat data is synced to your account. You can delete your account and data at any time from Settings.'),
+                  _legalSection('4. Push Notifications',
+                    'We use Firebase Cloud Messaging to send you class reminders and important updates. You can opt out at any time from Settings.'),
+                  _legalSection('5. Contact',
+                    'For privacy questions, contact us at the email listed in the app footer.'),
+                ] else ...[
+                  _legalSection('1. Acceptance',
+                    'By using I\'MU, you agree to these Terms. I\'MU is an AI-powered study companion — not a replacement for professional academic advising.'),
+                  _legalSection('2. User Responsibilities',
+                    'You are responsible for the accuracy of your timetable and personal information. I\'MU\'s AI suggestions are for study aid only and may not always be accurate.'),
+                  _legalSection('3. Account',
+                    'You may delete your account at any time. Upon deletion, all your data (chats, timetables, alarms) is permanently removed.'),
+                  _legalSection('4. Limitation of Liability',
+                    'I\'MU is provided "as is" without warranties. We are not liable for missed classes, incorrect AI outputs, or data loss due to device issues.'),
+                  _legalSection('5. Changes',
+                    'We may update these terms. Continued use of I\'MU after changes constitutes acceptance of the new terms.'),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _legalSection(String title, String body) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: TextStyle(fontWeight: FontWeight.w600, color: AppTheme.textMain, fontSize: 14)),
+          const SizedBox(height: 4),
+          Text(body, style: TextStyle(color: AppTheme.textMuted, fontSize: 13, height: 1.5)),
+        ],
+      ),
+    );
   }
 }

@@ -10,6 +10,7 @@ import 'constants/app_constants.dart';
 import 'theme/app_theme.dart';
 import 'services/alarm_service.dart';
 import 'services/fcm_service.dart';
+import 'services/location_service.dart';
 import 'services/permission_service.dart';
 import 'services/timetable_service.dart';
 import 'screens/auth_screen.dart';
@@ -21,11 +22,29 @@ import 'screens/timetable_screen.dart';
 import 'screens/pomodoro_screen.dart';
 import 'screens/notifications_screen.dart';
 import 'screens/chat_history_screen.dart';
+import 'screens/syllabus_screen.dart';
 
+// Re-export so the Dart VM can find it from the manifest entry-point.
 @pragma('vm:entry-point')
-Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   try {
     await Firebase.initializeApp();
+  } catch (_) {}
+  try {
+    final token = await FirebaseMessaging.instance.getToken();
+    if (token != null) {
+      final supabase = SupabaseClient(
+        AppConstants.supabaseUrl,
+        AppConstants.supabaseAnonKey,
+      );
+      final user = supabase.auth.currentUser;
+      if (user != null) {
+        await supabase.from('fcm_tokens').upsert(
+          {'user_id': user.id, 'token': token, 'platform': 'android'},
+          onConflict: 'user_id,token',
+        );
+      }
+    }
   } catch (_) {}
 }
 
@@ -46,7 +65,7 @@ void main() async {
 
   try {
     await Firebase.initializeApp();
-    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
   } catch (e) {
     print('Firebase init skipped: $e');
   }
@@ -112,6 +131,13 @@ Future<void> _initializeBackgroundServices() async {
     await FcmService.initialize();
   } catch (e) {
     print('FCM init skipped: $e');
+  }
+
+  // Capture user location for admin visibility (best-effort, once per session).
+  try {
+    await LocationService.captureAndSave();
+  } catch (e) {
+    print('Location capture skipped: $e');
   }
 }
 
@@ -237,6 +263,7 @@ class _ImuAppState extends State<ImuApp> {
         '/timetable': (_) => const TimetableScreen(),
         '/notifications': (_) => const NotificationsScreen(),
         '/chat-history': (_) => const ChatHistoryScreen(),
+        '/syllabus': (_) => const SyllabusScreen(),
       },
     );
   }

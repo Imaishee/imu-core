@@ -1,6 +1,51 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'alarm_service.dart';
+
+/// Top-level background handler — must be a top-level function (not inside a
+/// class) so the Dart VM can find it when Android wakes the isolate to deliver
+/// a background FCM message.  This runs even when the app was killed/rebooted.
+@pragma('vm:entry-point')
+Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  // Firebase must be initialized in the background isolate before we can
+  // touch any Firebase API.  Swallowed if it fails — the message is already
+  // delivered to the system tray by Android's FCM service.
+  try {
+    await Firebase.initializeApp();
+  } catch (_) {}
+
+  // Re-register the token so the server always has a valid target.
+  try {
+    final token = await FirebaseMessaging.instance.getToken();
+    if (token != null) {
+      await _bgStoreToken(token);
+    }
+  } catch (_) {}
+}
+
+/// Store FCM token from a background isolate.  We spin up a fresh Supabase
+/// client because the foreground instance doesn't exist here.
+Future<void> _bgStoreToken(String token) async {
+  try {
+    final supabase = SupabaseClient(
+      'https://cxiicvirllfdvcjwwcbj.supabase.co',
+      const String.fromEnvironment('SUPABASE_ANON_KEY',
+          defaultValue:
+              'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN4aWljdmlybGxmZHZjand3Y2JqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk0NTI2MjMsImV4cCI6MjEwNTAyODYyM30.XaNaSnX4S8_xqiOg1KvfhUzEcufspv0INMpfowLEcOY'),
+    );
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
+    await supabase.from('fcm_tokens').upsert(
+      {
+        'user_id': user.id,
+        'token': token,
+        'platform': 'android',
+      },
+      onConflict: 'user_id,token',
+    );
+  } catch (_) {}
+}
 
 /// Handles FCM token registration and foreground message display.
 ///
@@ -10,8 +55,8 @@ import 'alarm_service.dart';
 ///     notification so the user sees and hears it.
 ///   • **Background** — Android displays the `notification` payload
 ///     automatically (system tray).
-///   • **Killed** — Android's system FCM service receives the message
-///     and shows it.  Tapping opens the app.
+///   • **Killed / Rebooted** — The background handler above re-registers
+///     the token.  Android's system FCM service shows the notification.
 class FcmService {
   static final FirebaseMessaging _messaging = FirebaseMessaging.instance;
 

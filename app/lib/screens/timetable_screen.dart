@@ -83,19 +83,19 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
         children: [
           // Day selector
           SizedBox(
-            height: 50,
+            height: 56,
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               itemCount: days.length,
               itemBuilder: (ctx, i) {
                 final d = days[i];
                 final active = d == _selectedDay;
                 final today = DateTime.now().weekday - 1 == i;
-                return GestureDetector(
-                  onTap: () => setState(() => _selectedDay = d),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  return GestureDetector(
+                    onTap: () => setState(() => _selectedDay = d),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                     margin: const EdgeInsets.only(right: 8),
                     decoration: BoxDecoration(
                       color: active ? AppColors.greenPrimary : AppTheme.surface,

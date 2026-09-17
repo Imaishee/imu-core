@@ -1,20 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../providers/chat_provider.dart';
 import '../providers/app_provider.dart';
 import '../constants/app_constants.dart';
 import '../theme/app_theme.dart';
-import '../services/timetable_service.dart';
-import '../models/class_schedule.dart';
 import 'chat_screen.dart';
 import 'settings_screen.dart';
 import 'alarms_screen.dart';
-import 'pomodoro_screen.dart';
 import 'timetable_screen.dart';
 import 'notifications_screen.dart';
 import 'chat_history_screen.dart';
+import 'syllabus_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   final VoidCallback? onToggleTheme;
@@ -134,27 +131,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         Text('What would you like to learn today?',
                             style: TextStyle(fontSize: 14, color: AppTheme.textMuted)),
                         const SizedBox(height: 14),
-                        Row(children: [
-                          _quickAction(Icons.chat_bubble_outline, 'New Chat', AppColors.greenPrimary, () {
-                            final convo = ref.read(conversationsProvider.notifier).create();
-                            ref.read(activeConversationProvider.notifier).set(convo.remoteId);
-                            Navigator.push(context, MaterialPageRoute(builder: (_) => ChatScreen(conversationId: convo.remoteId)));
-                          }),
-                          const SizedBox(width: 10),
-                          _quickAction(Icons.school_outlined, 'Timetable', const Color(0xFF2D6A4F), () {
-                            Navigator.push(context, MaterialPageRoute(builder: (_) => const TimetableScreen()));
-                          }),
-                          const SizedBox(width: 10),
-                          _quickAction(Icons.alarm_add_outlined, 'Alarms', const Color(0xFF52B788), () {
-                            Navigator.push(context, MaterialPageRoute(builder: (_) => const AlarmsScreen()));
-                          }),
-                        ]),
-                        const SizedBox(height: 10),
-                        Row(children: [
-                          _quickAction(Icons.search, 'Ask anything', const Color(0xFF40916C), () {
-                            _showAskAI();
-                          }),
-                        ]),
+                        Wrap(
+                          spacing: 10,
+                          runSpacing: 10,
+                          children: [
+                            _quickAction(Icons.chat_bubble_outline, 'New Chat', AppColors.greenPrimary, () {
+                              final convo = ref.read(conversationsProvider.notifier).create();
+                              ref.read(activeConversationProvider.notifier).set(convo.remoteId);
+                              Navigator.push(context, MaterialPageRoute(builder: (_) => ChatScreen(conversationId: convo.remoteId)));
+                            }),
+                            _quickAction(Icons.school_outlined, 'Timetable', const Color(0xFF2D6A4F), () {
+                              Navigator.push(context, MaterialPageRoute(builder: (_) => const TimetableScreen()));
+                            }),
+                            _quickAction(Icons.alarm_add_outlined, 'Alarms', const Color(0xFF52B788), () {
+                              Navigator.push(context, MaterialPageRoute(builder: (_) => const AlarmsScreen()));
+                            }),
+                            _quickAction(Icons.menu_book_outlined, 'Syllabus', const Color(0xFF40916C), () {
+                              Navigator.push(context, MaterialPageRoute(builder: (_) => const SyllabusScreen()));
+                            }),
+                          ],
+                        ),
                       ],
                     ),
                   ),
@@ -282,11 +278,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  void _showAskAI() {
-    final convo = ref.read(conversationsProvider.notifier).create();
-    ref.read(activeConversationProvider.notifier).set(convo.remoteId);
-    Navigator.push(context, MaterialPageRoute(builder: (_) => ChatScreen(conversationId: convo.remoteId)));
-  }
 }
 
 class _UpdateBanner extends StatelessWidget {

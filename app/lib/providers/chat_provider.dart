@@ -214,7 +214,6 @@ class MessagesNotifier extends Notifier<List<ChatMessage>> {
           .map((m) => {'role': m.role, 'content': m.content})
           .toList();
 
-      String fullContent = '';
       await for (final event in ref
           .read(chatServiceProvider)
           .streamChat(messages: apiMessages, conversationId: _conversationId)) {
@@ -250,7 +249,6 @@ class MessagesNotifier extends Notifier<List<ChatMessage>> {
                 ),
               ];
             }
-            fullContent += text;
           }
         }
       }

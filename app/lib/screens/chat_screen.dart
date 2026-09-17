@@ -311,7 +311,7 @@ class _MessageBubble extends StatelessWidget {
     final content = message.content as String? ?? '';
 
     return Padding(
-      padding: EdgeInsets.only(bottom: 12, left: isUser ? 48 : 0, right: isUser ? 0 : 48),
+      padding: const EdgeInsets.only(bottom: 12),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -330,7 +330,9 @@ class _MessageBubble extends StatelessWidget {
             ),
             const SizedBox(width: 10),
           ],
+          if (isUser) const Spacer(),
           Flexible(
+            flex: isUser ? 3 : 1,
             child: GestureDetector(
               onLongPress: !isUser && content.isNotEmpty ? () => _showActions(context, content) : null,
               child: Container(
