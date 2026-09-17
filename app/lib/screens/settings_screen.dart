@@ -28,6 +28,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final _minorCtrl = TextEditingController();
   int _year = 1;
   int _semester = 1;
+  String _selectedModel = 'openai/gpt-oss-120b';
 
   @override
   void initState() {
@@ -50,6 +51,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _isDark = prefs.getBool('dark_mode') ?? false;
       _notifEnabled = prefs.getBool('notif_enabled') ?? true;
       _beforeMin = prefs.getInt('notif_before_min') ?? 10;
+      _selectedModel = prefs.getString('selected_model') ?? 'openai/gpt-oss-120b';
       setState(() {});
     }
   }
@@ -231,6 +233,62 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 Expanded(child: Text('Edit Timetable', style: TextStyle(color: AppTheme.textMain, fontWeight: FontWeight.w500))),
                 Icon(Icons.chevron_right, color: AppTheme.textMuted),
               ]),
+            ),
+
+            // ── AI Model
+            _section('AI Model'),
+            GlassCard(
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(children: [
+                    Icon(Icons.psychology_outlined, color: AppColors.greenMedium, size: 20),
+                    const SizedBox(width: 10),
+                    Text('Choose Model', style: TextStyle(color: AppTheme.textMain, fontWeight: FontWeight.w500)),
+                  ]),
+                  const SizedBox(height: 12),
+                  ...AppConstants.availableModels.map((m) {
+                    final isSelected = _selectedModel == m['id'];
+                    return GestureDetector(
+                      onTap: () async {
+                        setState(() => _selectedModel = m['id']!);
+                        final prefs = await SharedPreferences.getInstance();
+                        await prefs.setString('selected_model', m['id']!);
+                      },
+                      child: Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: isSelected ? AppColors.greenPrimary.withAlpha(25) : AppTheme.surface,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: isSelected ? AppColors.greenPrimary : AppTheme.border,
+                            width: isSelected ? 1.5 : 1,
+                          ),
+                        ),
+                        child: Row(children: [
+                          Icon(
+                            isSelected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+                            color: isSelected ? AppColors.greenPrimary : AppTheme.textMuted,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(m['name']!, style: TextStyle(color: AppTheme.textMain, fontWeight: FontWeight.w600, fontSize: 14)),
+                                Text(m['description']!, style: TextStyle(color: AppTheme.textMuted, fontSize: 11)),
+                              ],
+                            ),
+                          ),
+                        ]),
+                      ),
+                    );
+                  }),
+                ],
+              ),
             ),
 
             // ── Reminder options

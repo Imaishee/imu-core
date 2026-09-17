@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/chat_message.dart';
 import '../models/conversation.dart';
 import '../services/ai_actions_service.dart';
@@ -253,17 +254,54 @@ class MessagesNotifier extends Notifier<List<ChatMessage>> {
         }
       } catch (_) {}
 
+      // Chunk buffer: accumulate text, flush to state every 50ms to reduce rebuilds.
+      final StringBuffer _chunkBuffer = StringBuffer();
+      DateTime _lastFlush = DateTime.now();
+
+      Future<void> _flushBuffer() async {
+        if (_chunkBuffer.isEmpty) return;
+        final text = _chunkBuffer.toString();
+        _chunkBuffer.clear();
+        _lastFlush = DateTime.now();
+
+        if (state.isNotEmpty && state.last.role == 'assistant') {
+          final last = state.last;
+          state = [
+            ...state.sublist(0, state.length - 1),
+            ChatMessage(
+              conversationId: _conversationId,
+              role: 'assistant',
+              content: last.content + text,
+            ),
+          ];
+        } else {
+          state = [
+            ...state,
+            ChatMessage(
+              conversationId: _conversationId,
+              role: 'assistant',
+              content: text,
+            ),
+          ];
+        }
+      }
+
+      // Read selected model from settings
+      final prefs = await SharedPreferences.getInstance();
+      final selectedModel = prefs.getString('selected_model') ?? 'openai/gpt-oss-120b';
+
       await for (final event in ref
           .read(chatServiceProvider)
           .streamChat(
             messages: apiMessages,
             conversationId: _conversationId,
             context: chatContext.isNotEmpty ? chatContext : null,
+            model: selectedModel,
           )) {
         final type = event['type'];
 
         if (type == 'status') {
-          // Show thinking/search etc. above the message
+          await _flushBuffer();
           final step = event['step'] ?? 'working';
           final detail = event['detail'] ?? '';
           ref.read(thinkingStatusProvider.notifier).state =
@@ -272,29 +310,16 @@ class MessagesNotifier extends Notifier<List<ChatMessage>> {
         } else if (type == 'chunk') {
           final text = event['text'] as String;
           if (text.isNotEmpty) {
-            if (state.isNotEmpty && state.last.role == 'assistant') {
-              final last = state.last;
-              state = [
-                ...state.sublist(0, state.length - 1),
-                ChatMessage(
-                  conversationId: _conversationId,
-                  role: 'assistant',
-                  content: last.content + text,
-                ),
-              ];
-            } else {
-              state = [
-                ...state,
-                ChatMessage(
-                  conversationId: _conversationId,
-                  role: 'assistant',
-                  content: text,
-                ),
-              ];
+            _chunkBuffer.write(text);
+            // Flush if enough time has passed since last flush
+            if (DateTime.now().difference(_lastFlush).inMilliseconds >= 50) {
+              await _flushBuffer();
             }
           }
         }
       }
+      // Final flush for any remaining buffered text
+      await _flushBuffer();
     } catch (e) {
       // Replace any partial assistant content
       if (state.isNotEmpty && state.last.role == 'assistant') {

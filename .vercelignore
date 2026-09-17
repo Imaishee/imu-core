@@ -1,0 +1,6 @@
+app/
+backend/
+dist/
+node_modules/
+.git/
+*.apk

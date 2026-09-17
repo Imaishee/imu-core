@@ -9,7 +9,11 @@ export default function UsersPage() {
   const [conversations, setConversations] = useState<any[]>([]);
   const [loadingConvos, setLoadingConvos] = useState(false);
 
-  useEffect(() => { fetchUsers(); }, []);
+  useEffect(() => {
+    fetchUsers();
+    const interval = setInterval(fetchUsers, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   async function fetchUsers() {
     const res = await fetch('/api/users');
@@ -115,7 +119,15 @@ export default function UsersPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-white">Users</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-white">Users</h1>
+        <button
+          onClick={fetchUsers}
+          className="px-3 py-1.5 bg-[#27272a] hover:bg-[#3f3f46] rounded-lg text-xs text-zinc-400 hover:text-white transition-colors"
+        >
+          ↻ Refresh
+        </button>
+      </div>
       {loading ? (
         <div className="text-zinc-400">Loading...</div>
       ) : (

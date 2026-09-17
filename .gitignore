@@ -42,3 +42,5 @@ supabase/.temp/
 
 # Credentials (NEVER commit)
 backend/secrets/
+
+.vercel

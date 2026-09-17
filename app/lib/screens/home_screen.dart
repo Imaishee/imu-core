@@ -11,7 +11,6 @@ import 'alarms_screen.dart';
 import 'timetable_screen.dart';
 import 'notifications_screen.dart';
 import 'chat_history_screen.dart';
-import 'syllabus_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   final VoidCallback? onToggleTheme;
@@ -146,8 +145,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             _quickAction(Icons.alarm_add_outlined, 'Alarms', const Color(0xFF52B788), () {
                               Navigator.push(context, MaterialPageRoute(builder: (_) => const AlarmsScreen()));
                             }),
-                            _quickAction(Icons.menu_book_outlined, 'Syllabus', const Color(0xFF40916C), () {
-                              Navigator.push(context, MaterialPageRoute(builder: (_) => const SyllabusScreen()));
+                            _quickAction(Icons.camera_alt_outlined, 'Scan Schedule', const Color(0xFF40916C), () {
+                              Navigator.push(context, MaterialPageRoute(builder: (_) => const TimetableScreen()));
                             }),
                           ],
                         ),

@@ -6,7 +6,15 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Emit a status event the client can show as "thinking" — SSE-safe
+// Available models — client can request any of these; first is default
+const MODELS = [
+  "openai/gpt-oss-120b",
+  "openai/gpt-oss-20b",
+  "qwen/qwen3.8-27b",
+];
+const DEFAULT_MODEL = MODELS[0];
+const FALLBACK_MODEL = MODELS[1];
+
 function status(step: string, detail?: string) {
   return `data: ${JSON.stringify({ type: "status", step, detail })}\n\n`;
 }
@@ -17,53 +25,84 @@ function needsWebSearch(text: string): boolean {
   const keywords = [
     "latest", "news", "today", "current", "price", "weather", "who is", "who won",
     "recent", "search", "find", "look up", "what happened", "when did",
-    "stock", "score", "result", "update on", "tell me about", "do you know about",
-    "what are", "how much", "view on", "trending", "best", "top", "review",
-    "compare", "cost", "rates", "exchange", "crypto", "bitcoin", "recipe",
+    "stock", "score", "result", "trending", "best", "top", "review", "compare",
   ];
   return keywords.some(kw => lower.includes(kw));
 }
 
-// Simple free DuckDuckGo instant answer + search results
 async function webSearch(query: string): Promise<string> {
   try {
     const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
-    const ctrl = new AbortController();
-    const timeout = setTimeout(() => ctrl.abort(), 8000);
     const resp = await fetch(url, {
       headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" },
-      signal: ctrl.signal,
+      signal: AbortSignal.timeout(8000),
     });
-    clearTimeout(timeout);
     if (!resp.ok) return "";
     const html = await resp.text();
-
-    // Extract result titles + snippets
-    const results: string[] = [];
-    // DuckDuckGo html format: <a class="result__a" ...>title</a> ... <a class="result__snippet">snippet</a>
     const aMatches = html.match(/<a[^>]*class="result__a"[^>]*>([\s\S]*?)<\/a>/g) || [];
     const sMatches = html.match(/<a[^>]*class="result__snippet"[^>]*>([\s\S]*?)<\/a>/g) || [];
-
+    const results: string[] = [];
     for (let i = 0; i < Math.min(aMatches.length, 5); i++) {
       const title = aMatches[i].replace(/<[^>]+>/g, "").trim();
       const snippet = sMatches[i] ? sMatches[i].replace(/<[^>]+>/g, "").trim() : "";
       results.push(`${i + 1}. ${title}\n${snippet}`);
     }
     return results.join("\n\n");
-  } catch (e) {
-    return "";
-  }
+  } catch { return ""; }
 }
 
-// Simple webpage text extraction (for when user pastes a URL or for search results)
 function stripHtml(html: string): string {
-  return html
-    .replace(/<script[\s\S]*?<\/script>/gi, "")
-    .replace(/<style[\s\S]*?<\/style>/gi, "")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .substring(0, 2000); // keep context window sensible
+  return html.replace(/<script[\s\S]*?<\/script>/gi, "").replace(/<style[\s\S]*?<\/style>/gi, "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().substring(0, 1500);
+}
+
+// Truncate system prompt to fit within model context limits
+function truncatePrompt(prompt: string, maxLen = 4000): string {
+  if (prompt.length <= maxLen) return prompt;
+  // Keep first 2000 chars (usually the core instructions) + last part
+  const keep = maxLen - 200;
+  return prompt.substring(0, 2000) + `\n\n[... truncated for speed, ${prompt.length - 2000} chars removed ...]\n\n` + prompt.substring(prompt.length - keep);
+}
+
+// Call Groq API with retry + fallback
+async function callGroq(
+  groqApiKey: string,
+  systemPrompt: string,
+  userMessages: any[],
+  model: string,
+  stream = true,
+): Promise<Response> {
+  const body: any = {
+    model,
+    messages: [
+      { role: "system", content: systemPrompt },
+      ...userMessages.map((m: any) => ({ role: m.role, content: m.content })),
+    ],
+    stream,
+    max_tokens: 2048,
+    temperature: 0.75,
+  };
+
+  const resp = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${groqApiKey}` },
+    body: JSON.stringify(body),
+  });
+
+  return resp;
+}
+
+// Fallback non-streaming call to get at least something back
+async function fallbackCall(
+  groqApiKey: string,
+  systemPrompt: string,
+  userMessages: any[],
+): Promise<string> {
+  try {
+    const resp = await callGroq(groqApiKey, systemPrompt, userMessages, FALLBACK_MODEL, false);
+    if (!resp.ok) return "";
+    const data = await resp.json();
+    return data.choices?.[0]?.message?.content || "";
+  } catch { return ""; }
 }
 
 serve(async (req) => {
@@ -78,7 +117,6 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Auth — optional user context
     let userId: string | null = null;
     let userProfile: any = null;
     const authHeader = req.headers.get("Authorization");
@@ -92,7 +130,10 @@ serve(async (req) => {
       } catch {}
     }
 
-    const { messages, conversation_id, model = "openai/gpt-oss-20b", context } = await req.json();
+    const { messages, conversation_id, model = DEFAULT_MODEL, context } = await req.json();
+
+    // Validate requested model
+    const requestedModel = MODELS.includes(model) ? model : DEFAULT_MODEL;
 
     // Fetch active system prompt
     const { data: promptData } = await supabase
@@ -104,7 +145,7 @@ serve(async (req) => {
 
     const basePrompt = promptData?.prompt || "You are I'MU, a helpful AI study assistant.";
 
-    // User profile context when authenticated
+    // User profile context
     let profileContext = "";
     if (userId) {
       try {
@@ -114,117 +155,113 @@ serve(async (req) => {
           .eq("id", userId)
           .single();
         if (prof) {
-          profileContext = `\n\nUser Profile:\n- Name: ${prof.name}\n- University: ${prof.university}\n- Programme: ${prof.programme}\n- Year: ${prof.year}, Semester: ${prof.semester}\n- Major: ${prof.major}, Minor: ${prof.minor}\n\nAddress them by name when natural. Reference their studies when relevant.`;
+          profileContext = `\nUser: ${prof.name}. Uni: ${prof.university}. Programme: ${prof.programme}. Year ${prof.year} Sem ${prof.semester}. Major: ${prof.major}.`;
         }
       } catch {}
     }
 
-    // Knowledge graph context
+    // Knowledge context
     let knowledgeContext = "";
     if (userId) {
-      const { data: knowledgeNodes } = await supabase
+      const { data: kn } = await supabase
         .from("knowledge_nodes")
         .select("label, node_type, content")
         .eq("user_id", userId)
         .order("updated_at", { ascending: false })
-        .limit(20);
-
-      if (knowledgeNodes && knowledgeNodes.length > 0) {
-        knowledgeContext = "\n\nUser Knowledge:\n" +
-          knowledgeNodes.map((n: any) => `- ${n.label} (${n.node_type}): ${n.content || "no details"}`).join("\n");
+        .limit(10);
+      if (kn && kn.length > 0) {
+        knowledgeContext = "\nKnowledge:\n" + kn.map((n: any) => `- ${n.label} (${n.node_type})`).join("\n");
       }
     }
 
-    let systemPrompt = basePrompt + profileContext + knowledgeContext;
-
-    // Timetable + alarm context from the client
+    // TIMETABLE + ALARM context
+    let scheduleContext = "";
     if (context && typeof context === "object") {
       const classes = Array.isArray(context.classes) ? context.classes : [];
       const alarms = Array.isArray(context.alarms) ? context.alarms : [];
       if (classes.length) {
-        systemPrompt += `\n\nUSER'S WEEKLY TIMETABLE:\n${classes.map((c: any) =>
-          `- ${c.course_name}${c.course_code ? ` (${c.course_code})` : ""} on ${c.day} ${c.start_time}-${c.end_time}${c.room ? ` in ${c.room}` : ""}${c.instructor ? ` with ${c.instructor}` : ""}`,
-        ).join("\n")}\n\nWhen the user asks about their schedule, classes, or timetable, answer from this data. For requests to add/remove/edit classes or set/delete alarms, reply with a brief confirmation — the app handles the actual changes automatically.`;
-      } else {
-        systemPrompt += `\n\nUSER'S TIMETABLE: (empty — no classes added yet)\n\nWhen the user wants to add classes, tell them you'll set it up. The app handles the actual changes automatically.`;
-      }
-      if (alarms.length) {
-        systemPrompt += `\n\nUSER'S ALARMS:\n${alarms.map((a: any) =>
-          `- "${a.label}" at ${a.time}${Array.isArray(a.days) && a.days.length ? ` on days ${a.days.join(",")}` : " (one-time)"}`,
+        scheduleContext += `\nTimetable:\n${classes.map((c: any) =>
+          `- ${c.course_name}${c.course_code ? ` (${c.course_code})` : ""} ${c.day} ${c.start_time}-${c.end_time}${c.room ? ` ${c.room}` : ""}${c.instructor ? ` ${c.instructor}` : ""}`,
         ).join("\n")}`;
       }
+      if (alarms.length) {
+        scheduleContext += `\nAlarms:\n${alarms.map((a: any) =>
+          `- "${a.label}" ${a.time}${Array.isArray(a.days) && a.days.length ? ` ${a.days.join(",")}` : ""}`,
+        ).join("\n")}`;
+      }
+      scheduleContext += "\nFor schedule/alarm changes, confirm briefly — app handles actual changes.";
     }
 
-    // =========== WEB SEARCH LOGIC ===========
+    // Build final system prompt and truncate
+    let systemPrompt = truncatePrompt(basePrompt + profileContext + knowledgeContext + scheduleContext);
+
+    // Web search
     const lastUserMsg = messages[messages.length - 1];
     const msgText = lastUserMsg?.content?.toString() || "";
     let webContext = "";
     const statusSteps: Array<{ step: string; detail?: string }> = [];
 
-    // Check if any message contains a URL the user wants analyzed
+    // URL scraping
     const urls = msgText.match(/https?:\/\/[^\s]+/g);
     if (urls && urls.length > 0) {
-      for (const url of urls.slice(0, 3)) {
+      for (const url of urls.slice(0, 2)) {
         try {
-          statusSteps.push({ step: "scraping", detail: url });
+          statusSteps.push({ step: "scraping", detail: url.substring(0, 60) });
           const scrapeResp = await fetch(url, {
             headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" },
-            signal: AbortSignal.timeout(8000),
+            signal: AbortSignal.timeout(6000),
           });
           if (scrapeResp.ok) {
-            const html = await scrapeResp.text();
-            const text = stripHtml(html);
-            if (text.length > 100) {
-              webContext += `\n\nWeb content from ${url}:\n${text}\n`;
-            }
+            const text = stripHtml(await scrapeResp.text());
+            if (text.length > 100) webContext += `\nWeb: ${url.substring(0, 50)}\n${text}\n`;
           }
         } catch {}
       }
     }
 
-    // Web search if the user is asking about current/factual things
+    // Web search
     if (needsWebSearch(msgText)) {
-      statusSteps.push({ step: "thinking" });
-      statusSteps.push({ step: "searching", detail: msgText.substring(0, 80) });
+      statusSteps.push({ step: "searching", detail: msgText.substring(0, 60) });
       const results = await webSearch(msgText);
       if (results) {
-        const sources = results.split("\n\n").map(r => {
-          const m = r.match(/^\d+\.\s*(.+)/);
-          return m ? m[1] : "";
-        }).filter(Boolean).slice(0, 3);
-        statusSteps.push({ step: "search_done", detail: `${sources.length} sources found` });
-        webContext += `\n\nWeb Search Results:\n${results}\n\nUse these sources to answer accurately. Cite which source provides each fact (e.g., "According to Source 1...").`;
+        webContext += `\nSearch results:\n${results}`;
       }
     }
 
     if (webContext) {
-      systemPrompt += `\n\n=== WEB CONTEXT ===${webContext}\n\nIMPORTANT: If you used web sources, say where information came from. Do not make up sources.`;
+      systemPrompt += `\n\n${webContext}`;
+      // Re-truncate after adding web context
+      systemPrompt = truncatePrompt(systemPrompt);
     }
-    // ========================================
 
-    // Call Groq
-    const groqBody = {
-      model,
-      messages: [
-        { role: "system", content: systemPrompt },
-        ...messages.map((m: any) => ({ role: m.role, content: m.content })),
-      ],
-      stream: true,
-      max_tokens: 2048,
-      temperature: 0.75,
-    };
+    // FIRST attempt — primary model, streaming
+    let response = await callGroq(groqApiKey, systemPrompt, messages, requestedModel);
 
-    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${groqApiKey}` },
-      body: JSON.stringify(groqBody),
-    });
+    // RETRY — if first call fails, try fallback model
+    if (!response.ok) {
+      statusSteps.push({ step: "thinking", detail: "Retrying..." });
+      response = await callGroq(groqApiKey, systemPrompt, messages, FALLBACK_MODEL);
+    }
 
     if (!response.ok) {
+      // Last resort: non-streaming fallback
+      const fallbackContent = await fallbackCall(groqApiKey, systemPrompt, messages);
+      if (fallbackContent) {
+        const encoder = new TextEncoder();
+        const stream = new ReadableStream({
+          async start(controller) {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: fallbackContent } }] })}\n\n`));
+            controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+            controller.close();
+          },
+        });
+        return new Response(stream, {
+          headers: { ...corsHeaders, "Content-Type": "text/event-stream", "Cache-Control": "no-cache" },
+        });
+      }
       const err = await response.text();
       return new Response(JSON.stringify({ error: err }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -234,14 +271,14 @@ serve(async (req) => {
 
     const stream = new ReadableStream({
       async start(controller) {
-        // Send thinking/status events BEFORE the content
         for (const notif of statusSteps) {
           controller.enqueue(encoder.encode(status(notif.step, notif.detail)));
-          await new Promise(r => setTimeout(r, 200)); // slight delay so it feels like thinking
+          await new Promise(r => setTimeout(r, 150));
         }
 
         let fullContent = "";
         let buffer = "";
+        let receivedAnyContent = false;
 
         while (true) {
           const { done, value } = await reader.read();
@@ -256,14 +293,23 @@ serve(async (req) => {
             if (line.startsWith("data: ")) {
               const data = line.slice(6).trim();
               if (data === "[DONE]") {
+                // If AI returned nothing, send a fallback response
+                if (!receivedAnyContent || fullContent.length === 0) {
+                  const fallback = "I apologize — I couldn't generate a full response. Could you try rephrasing your message?";
+                  fullContent = fallback;
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: fallback } }] })}\n\n`));
+                  receivedAnyContent = true;
+                }
                 // Save to DB
-                if (conversation_id && fullContent && userId) {
-                  await supabase.from("messages").insert({
-                    conversation_id, role: "user", content: msgText,
-                  });
-                  await supabase.from("messages").insert({
-                    conversation_id, role: "assistant", content: fullContent, model,
-                  });
+                if (conversation_id && userId) {
+                  try {
+                    await supabase.from("messages").insert({
+                      conversation_id, role: "user", content: msgText,
+                    });
+                    await supabase.from("messages").insert({
+                      conversation_id, role: "assistant", content: fullContent, model: requestedModel,
+                    });
+                  } catch {}
                 }
                 controller.enqueue(encoder.encode("data: [DONE]\n\n"));
                 controller.close();
@@ -274,27 +320,41 @@ serve(async (req) => {
                 const content = parsed.choices?.[0]?.delta?.content || "";
                 if (content) {
                   fullContent += content;
+                  receivedAnyContent = true;
                   controller.enqueue(encoder.encode(`data: ${data}\n\n`));
                 }
               } catch {}
             }
           }
         }
+
+        // Stream ended without [DONE] — still send fallback if empty
+        if (!receivedAnyContent || fullContent.length === 0) {
+          const fallback = "I apologize — I couldn't generate a full response. Could you try rephrasing your message?";
+          fullContent = fallback;
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: fallback } }] })}\n\n`));
+        }
+        if (conversation_id && userId) {
+          try {
+            await supabase.from("messages").insert({
+              conversation_id, role: "user", content: msgText,
+            });
+            await supabase.from("messages").insert({
+              conversation_id, role: "assistant", content: fullContent, model: requestedModel,
+            });
+          } catch {}
+        }
+        controller.enqueue(encoder.encode("data: [DONE]\n\n"));
         controller.close();
       },
     });
 
     return new Response(stream, {
-      headers: {
-        ...corsHeaders,
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache",
-      },
+      headers: { ...corsHeaders, "Content-Type": "text/event-stream", "Cache-Control": "no-cache" },
     });
   } catch (error) {
     return new Response(JSON.stringify({ error: String(error) }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });

@@ -22,7 +22,6 @@ import 'screens/timetable_screen.dart';
 import 'screens/pomodoro_screen.dart';
 import 'screens/notifications_screen.dart';
 import 'screens/chat_history_screen.dart';
-import 'screens/syllabus_screen.dart';
 
 // Re-export so the Dart VM can find it from the manifest entry-point.
 @pragma('vm:entry-point')
@@ -263,7 +262,6 @@ class _ImuAppState extends State<ImuApp> {
         '/timetable': (_) => const TimetableScreen(),
         '/notifications': (_) => const NotificationsScreen(),
         '/chat-history': (_) => const ChatHistoryScreen(),
-        '/syllabus': (_) => const SyllabusScreen(),
       },
     );
   }

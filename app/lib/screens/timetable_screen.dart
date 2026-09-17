@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import '../models/class_schedule.dart';
 import '../providers/app_provider.dart';
 import '../services/timetable_service.dart';
+import '../services/vision_timetable_service.dart';
 import '../theme/app_theme.dart';
 
 class TimetableScreen extends ConsumerStatefulWidget {
@@ -34,7 +36,7 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
 
   Future<void> _parseWithAI(String text) async {
     try {
-      final classes = await TimetableService.parseWithAI(text);
+      final classes = await VisionTimetableService.parseFromText(text);
       if (classes.isNotEmpty) {
         showDialog(
           context: context,
@@ -52,9 +54,94 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
     }
   }
 
-  Future<void> _importFromFile() async {
-    // Simplified: let user paste text
-    showDialog(context: context, builder: (_) => _ImportTextDialog(onParse: _parseWithAI));
+  Future<void> _parseWithVision(String imagePath) async {
+    try {
+      _showError('Analyzing image...');
+      final classes = await VisionTimetableService.parseFromImage(imagePath);
+      if (classes.isNotEmpty) {
+        showDialog(
+          context: context,
+          builder: (_) => _PreviewParsedDialog(classes: classes, onConfirm: (finalClasses) async {
+            for (final c in finalClasses) {
+              await ref.read(timetableProvider.notifier).add(c);
+            }
+          }),
+        );
+      } else {
+        _showError('Could not extract classes from image. Try a clearer photo.');
+      }
+    } catch (e) {
+      _showError('Vision parse failed: $e');
+    }
+  }
+
+  void _importFromFile() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppTheme.surface,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(width: 40, height: 4, margin: const EdgeInsets.only(top: 8, bottom: 16), decoration: BoxDecoration(color: AppTheme.textMuted.withAlpha(60), borderRadius: BorderRadius.circular(2))),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Text('Import Timetable', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppTheme.textMain)),
+            ),
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Text('Choose how to import your schedule', style: TextStyle(color: AppTheme.textMuted, fontSize: 13)),
+            ),
+            const SizedBox(height: 16),
+            _importOption(
+              icon: Icons.camera_alt_outlined,
+              label: 'Take Photo',
+              subtitle: ' photograph of your timetable',
+              onTap: () async {
+                Navigator.pop(ctx);
+                final picked = await ImagePicker().pickImage(source: ImageSource.camera, imageQuality: 85, maxWidth: 2048);
+                if (picked != null) _parseWithVision(picked.path);
+              },
+            ),
+            _importOption(
+              icon: Icons.photo_library_outlined,
+              label: 'Upload Image',
+              subtitle: 'Pick from gallery',
+              onTap: () async {
+                Navigator.pop(ctx);
+                final picked = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 85, maxWidth: 2048);
+                if (picked != null) _parseWithVision(picked.path);
+              },
+            ),
+            _importOption(
+              icon: Icons.content_paste_outlined,
+              label: 'Paste Text',
+              subtitle: 'Paste timetable text',
+              onTap: () {
+                Navigator.pop(ctx);
+                showDialog(context: context, builder: (_) => _ImportTextDialog(onParse: _parseWithAI));
+              },
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _importOption({required IconData icon, required String label, required String subtitle, required VoidCallback onTap}) {
+    return ListTile(
+      leading: Container(
+        width: 44, height: 44,
+        decoration: BoxDecoration(color: AppColors.greenPrimary.withAlpha(25), borderRadius: BorderRadius.circular(12)),
+        child: Icon(icon, color: AppColors.greenPrimary),
+      ),
+      title: Text(label, style: TextStyle(color: AppTheme.textMain, fontWeight: FontWeight.w600)),
+      subtitle: Text(subtitle, style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
+      onTap: onTap,
+    );
   }
 
   void _showError(String msg) {

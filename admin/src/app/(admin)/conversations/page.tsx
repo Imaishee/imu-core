@@ -11,6 +11,8 @@ export default function ConversationsPage() {
 
   useEffect(() => {
     fetchConversations();
+    const interval = setInterval(fetchConversations, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   async function fetchConversations() {
@@ -81,7 +83,15 @@ export default function ConversationsPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-white">Conversations</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-white">Conversations</h1>
+        <button
+          onClick={fetchConversations}
+          className="px-3 py-1.5 bg-[#27272a] hover:bg-[#3f3f46] rounded-lg text-xs text-zinc-400 hover:text-white transition-colors"
+        >
+          ↻ Refresh
+        </button>
+      </div>
 
       {loading ? (
         <div className="text-zinc-400">Loading...</div>

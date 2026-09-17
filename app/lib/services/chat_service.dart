@@ -33,6 +33,7 @@ class ChatService {
     required List<Map<String, String>> messages,
     String? conversationId,
     Map<String, dynamic>? context,
+    String? model,
   }) async* {
     final headers = <String, String>{
       'Content-Type': 'application/json',
@@ -53,7 +54,7 @@ class ChatService {
       'messages': messages,
       if (conversationId != null) 'conversation_id': conversationId,
       if (context != null) 'context': context,
-      'model': AppConstants.defaultModel,
+      'model': model ?? AppConstants.defaultModel,
     });
 
     final response = await http.Client().send(request).timeout(_timeout);
