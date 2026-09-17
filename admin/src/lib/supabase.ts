@@ -69,6 +69,16 @@ export async function getActivityLog() {
   return { data: data || [], error };
 }
 
+export async function getConversationMessages(conversationId: string) {
+  const supabase = getClient();
+  const { data, error } = await supabase
+    .from('messages')
+    .select('*')
+    .eq('conversation_id', conversationId)
+    .order('created_at', { ascending: true });
+  return { data: data || [], error };
+}
+
 export async function getSystemPrompts() {
   const supabase = getClient();
   const { data, error } = await supabase

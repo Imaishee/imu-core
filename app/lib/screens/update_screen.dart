@@ -43,7 +43,12 @@ class _UpdateScreenState extends State<UpdateScreen> {
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: const Center(
-                    child: Text('IM', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 24)),
+                    child: Padding(
+                      padding: EdgeInsets.all(15),
+                      child: FittedBox(
+                        child: Text("I'MU", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 24),

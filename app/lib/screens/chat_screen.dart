@@ -55,6 +55,43 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     if (picked != null) setState(() => _pendingImage = File(picked.path));
   }
 
+  void _showRenameDialog(BuildContext context, WidgetRef ref, String convoId, String currentTitle) {
+    final ctrl = TextEditingController(text: currentTitle);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.surface,
+        title: Text('Rename Chat', style: TextStyle(color: AppTheme.textMain)),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          style: TextStyle(color: AppTheme.textMain),
+          decoration: InputDecoration(
+            hintText: 'Chat name',
+            hintStyle: TextStyle(color: AppTheme.textMuted),
+            filled: true,
+            fillColor: AppTheme.darkBg,
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppTheme.border)),
+            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColors.greenLight)),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Cancel', style: TextStyle(color: AppTheme.textMuted))),
+          TextButton(
+            onPressed: () {
+              final newTitle = ctrl.text.trim();
+              if (newTitle.isNotEmpty) {
+                ref.read(conversationsProvider.notifier).updateTitle(convoId, newTitle);
+              }
+              Navigator.pop(ctx);
+            },
+            child: Text('Save', style: TextStyle(color: AppColors.greenLight)),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _sendMessage() async {
     final text = _inputController.text.trim();
     if ((text.isEmpty && _pendingImage == null) || _isStreaming) return;
@@ -75,7 +112,20 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     return Scaffold(
       backgroundColor: AppTheme.bg,
       appBar: AppBar(
-        title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppTheme.textMain)),
+        title: GestureDetector(
+          onTap: () => _showRenameDialog(context, ref, widget.conversationId, title),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppTheme.textMain)),
+              ),
+              const SizedBox(width: 6),
+              Icon(Icons.edit, size: 14, color: AppTheme.textMuted),
+            ],
+          ),
+        ),
         actions: [
           IconButton(
             onPressed: () {
@@ -100,10 +150,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                             gradient: const LinearGradient(colors: [AppColors.greenPrimary, AppColors.greenLight], begin: Alignment.topLeft, end: Alignment.bottomRight),
                             borderRadius: BorderRadius.circular(18),
                           ),
-                          child: const Center(child: Text('IM', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20))),
+                          child: const Center(
+                            child: Padding(
+                              padding: EdgeInsets.all(12),
+                              child: FittedBox(
+                                child: Text("I'MU", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                              ),
+                            ),
+                          ),
                         ),
                         const SizedBox(height: 16),
-                        Text("Hi, I'm IM'U", style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: AppTheme.textMain)),
+                        Text("Hi, I'm I'MU", style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: AppTheme.textMain)),
                         const SizedBox(height: 6),
                         Text('How can I help you today?', style: TextStyle(color: AppTheme.textMuted)),
                       ],
@@ -262,7 +319,14 @@ class _MessageBubble extends StatelessWidget {
             Container(
               width: 28, height: 28,
               decoration: BoxDecoration(color: AppColors.greenPrimary, borderRadius: BorderRadius.circular(10)),
-              child: const Center(child: Text('IM', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 9))),
+              child: const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(5),
+                  child: FittedBox(
+                    child: Text("I'MU", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ),
             ),
             const SizedBox(width: 10),
           ],

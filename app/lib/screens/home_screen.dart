@@ -83,10 +83,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     gradient: const LinearGradient(colors: [AppColors.greenPrimary, AppColors.greenLight], begin: Alignment.topLeft, end: Alignment.bottomRight),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Center(child: Text('IM', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13))),
+                  child: const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(6),
+                      child: FittedBox(
+                        child: Text("I'MU", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                  ),
                 ),
                 const SizedBox(width: 10),
-                Text("IM'U", style: TextStyle(fontWeight: FontWeight.w700, fontSize: 20, color: AppTheme.textMain)),
+                Text("I'MU", style: TextStyle(fontWeight: FontWeight.w700, fontSize: 20, color: AppTheme.textMain)),
               ]),
               actions: [
                 _iconBtn(Icons.notifications_outlined, widget.unreadNotifications > 0 ? Colors.redAccent : AppTheme.textMain, () {
@@ -213,7 +220,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           const SizedBox(height: 12),
                           Text('No chats yet', style: TextStyle(color: AppTheme.textMuted, fontSize: 14)),
                           const SizedBox(height: 6),
-                          Text('Start a conversation with IM\'U!', style: TextStyle(color: AppTheme.textMuted, fontSize: 13)),
+                          Text('Start a conversation with I\'MU!', style: TextStyle(color: AppTheme.textMuted, fontSize: 13)),
                         ]),
                       ),
                     ),

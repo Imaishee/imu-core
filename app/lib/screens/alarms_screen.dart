@@ -54,7 +54,7 @@ class _AlarmsScreenState extends State<AlarmsScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: const Text(
-            'Exact alarms are blocked. Enable "Alarms & reminders" for IM\'U in Android settings so alarms fire on time.'),
+            'Exact alarms are blocked. Enable "Alarms & reminders" for I\'MU in Android settings so alarms fire on time.'),
         action: SnackBarAction(
           label: 'Retry',
           onPressed: () async {
@@ -150,20 +150,27 @@ class _AlarmsScreenState extends State<AlarmsScreen> {
                         child: Row(children: [
                           Icon(Icons.snooze, color: AppColors.greenMedium, size: 20),
                           const SizedBox(width: 12),
-                          Text('Snooze', style: TextStyle(color: AppTheme.textMain, fontSize: 14)),
-                          const Spacer(),
-                          DropdownButton<int>(
-                            value: _snoozeMinutes,
-                            dropdownColor: AppTheme.surface,
-                            underline: const SizedBox(),
-                            items: const [
-                              DropdownMenuItem(value: 1, child: Text('1 min')),
-                              DropdownMenuItem(value: 5, child: Text('5 min')),
-                              DropdownMenuItem(value: 10, child: Text('10 min')),
-                              DropdownMenuItem(value: 15, child: Text('15 min')),
-                              DropdownMenuItem(value: 30, child: Text('30 min')),
-                            ],
-                            onChanged: (v) => setState(() => _snoozeMinutes = v!),
+                          Expanded(
+                            child: Text('Snooze',
+                                style: TextStyle(color: AppTheme.textMain, fontSize: 14),
+                                overflow: TextOverflow.ellipsis),
+                          ),
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: DropdownButton<int>(
+                              value: _snoozeMinutes,
+                              isExpanded: true,
+                              dropdownColor: AppTheme.surface,
+                              underline: const SizedBox(),
+                              items: const [
+                                DropdownMenuItem(value: 1, child: Text('1 min')),
+                                DropdownMenuItem(value: 5, child: Text('5 min')),
+                                DropdownMenuItem(value: 10, child: Text('10 min')),
+                                DropdownMenuItem(value: 15, child: Text('15 min')),
+                                DropdownMenuItem(value: 30, child: Text('30 min')),
+                              ],
+                              onChanged: (v) => setState(() => _snoozeMinutes = v!),
+                            ),
                           ),
                         ]),
                       ),
@@ -173,19 +180,26 @@ class _AlarmsScreenState extends State<AlarmsScreen> {
                         child: Row(children: [
                           Icon(Icons.volume_up, color: AppColors.greenMedium, size: 20),
                           const SizedBox(width: 12),
-                          Text('Alarm Sound', style: TextStyle(color: AppTheme.textMain, fontSize: 14)),
-                          const Spacer(),
-                          DropdownButton<String>(
-                            value: _soundChoice,
-                            dropdownColor: AppTheme.surface,
-                            underline: const SizedBox(),
-                            items: const [
-                              DropdownMenuItem(value: 'default', child: Text('Default')),
-                              DropdownMenuItem(value: 'gentle', child: Text('Gentle chime')),
-                              DropdownMenuItem(value: 'loud', child: Text('Loud alarm')),
-                              DropdownMenuItem(value: 'beep', child: Text('Beep')),
-                            ],
-                            onChanged: (v) => setState(() => _soundChoice = v!),
+                          Expanded(
+                            child: Text('Alarm Sound',
+                                style: TextStyle(color: AppTheme.textMain, fontSize: 14),
+                                overflow: TextOverflow.ellipsis),
+                          ),
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: DropdownButton<String>(
+                              value: _soundChoice,
+                              isExpanded: true,
+                              dropdownColor: AppTheme.surface,
+                              underline: const SizedBox(),
+                              items: const [
+                                DropdownMenuItem(value: 'default', child: Text('Default')),
+                                DropdownMenuItem(value: 'gentle', child: Text('Gentle')),
+                                DropdownMenuItem(value: 'loud', child: Text('Loud')),
+                                DropdownMenuItem(value: 'beep', child: Text('Beep')),
+                              ],
+                              onChanged: (v) => setState(() => _soundChoice = v!),
+                            ),
                           ),
                         ]),
                       ),
@@ -247,7 +261,7 @@ class _AlarmsScreenState extends State<AlarmsScreen> {
                             Switch(
                               value: alarm.enabled,
                               onChanged: (v) => _toggleAlarm(alarm, v),
-                              activeColor: AppColors.greenPrimary,
+                              activeThumbColor: AppColors.greenPrimary,
                             ),
                             IconButton(onPressed: () => _deleteAlarm(alarm.id), icon: Icon(Icons.delete_outline, size: 18, color: AppTheme.textMuted)),
                           ]),
@@ -287,6 +301,10 @@ class _AlarmDialogState extends State<_AlarmDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       backgroundColor: AppTheme.surface,
+      // Without `scrollable` the dialog overflows whenever the on-screen
+      // keyboard is up or the device is short — the content is taller than
+      // the space the dialog is given.
+      scrollable: true,
       title: Text('Set Alarm', style: TextStyle(color: AppTheme.textMain)),
       content: Column(
         mainAxisSize: MainAxisSize.min,

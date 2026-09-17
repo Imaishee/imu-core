@@ -9,6 +9,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'constants/app_constants.dart';
 import 'theme/app_theme.dart';
 import 'services/alarm_service.dart';
+import 'services/fcm_service.dart';
 import 'services/permission_service.dart';
 import 'services/timetable_service.dart';
 import 'screens/auth_screen.dart';
@@ -104,6 +105,14 @@ Future<void> _initializeBackgroundServices() async {
   } catch (e) {
     print('Saved alarms skipped: $e');
   }
+
+  // Register the device token with Supabase so the notify edge function
+  // can send real push notifications (system tray) when admin sends one.
+  try {
+    await FcmService.initialize();
+  } catch (e) {
+    print('FCM init skipped: $e');
+  }
 }
 
 class ImuApp extends StatefulWidget {
@@ -195,7 +204,7 @@ class _ImuAppState extends State<ImuApp> {
     final session = _currentSession();
 
     return MaterialApp(
-      title: "IM'U — Study Companion",
+      title: "I'MU — Study Companion",
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,

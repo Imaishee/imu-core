@@ -1,7 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 
-/// IM'U Liquid Glass + Cream/Green theme
+/// I'MU Liquid Glass + Cream/Green theme
 class AppColors {
   // Cream palette (light)
   static const creamBg = Color(0xFFFBF6EC);

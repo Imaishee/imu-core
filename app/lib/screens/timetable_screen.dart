@@ -352,7 +352,7 @@ class _ImportTextDialogState extends State<_ImportTextDialog> {
       backgroundColor: AppTheme.surface,
       title: Text('Import Timetable', style: TextStyle(color: AppTheme.textMain)),
       content: Column(mainAxisSize: MainAxisSize.min, children: [
-        Text('Paste your timetable text below and IM\'U will parse it into classes automatically.', style: TextStyle(color: AppTheme.textMuted, fontSize: 13)),
+        Text('Paste your timetable text below and I\'MU will parse it into classes automatically.', style: TextStyle(color: AppTheme.textMuted, fontSize: 13)),
         const SizedBox(height: 12),
         TextField(
           controller: _ctrl,

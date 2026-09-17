@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -16,10 +17,19 @@ class AlarmService {
   static final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
 
-  static const _channelId = 'imu_class_reminders';
-  static const _channelName = 'Class & Study Reminders';
-  static const _channelDesc =
-      'Reminders for your classes, study sessions and alarms';
+  // Android notification channels are IMMUTABLE once created: changing
+  // `playSound` / importance in code has no effect on an existing channel on
+  // an installed device. The alarm channels therefore carry a version suffix
+  // so a corrected configuration actually reaches existing installs.
+  static const _reminderChannelId = 'imu_class_reminders_v2';
+  static const _reminderChannelName = 'Class & Study Reminders';
+  static const _reminderChannelDesc =
+      'Reminders for your classes and study sessions';
+
+  static const _alarmChannelId = 'imu_alarms_v2';
+  static const _alarmChannelName = 'Alarms';
+  static const _alarmChannelDesc =
+      'Your alarms — plays at full alarm volume, even in silent mode';
 
   static const _alarmsPrefsKey = 'alarms';
 
@@ -55,7 +65,12 @@ class AlarmService {
       );
       await _plugin.initialize(
         const InitializationSettings(android: android, iOS: ios),
-        onDidReceiveNotificationResponse: (details) {},
+        onDidReceiveNotificationResponse: (details) {
+          // User tapped "Dismiss" on an alarm — cancel it so the sound stops.
+          if (details.actionId == 'alarm_dismiss' && details.id != null) {
+            _plugin.cancel(details.id!);
+          }
+        },
       );
 
       final androidImpl = _plugin.resolvePlatformSpecificImplementation<
@@ -63,13 +78,31 @@ class AlarmService {
 
       await androidImpl?.createNotificationChannel(
         const AndroidNotificationChannel(
-          _channelId,
-          _channelName,
-          description: _channelDesc,
+          _reminderChannelId,
+          _reminderChannelName,
+          description: _reminderChannelDesc,
           importance: Importance.max,
           playSound: true,
           enableVibration: true,
           enableLights: true,
+          audioAttributesUsage: AudioAttributesUsage.notification,
+        ),
+      );
+
+      // Alarms must be audible even when the ringer is on silent/vibrate,
+      // so they are routed to the alarm audio stream (not the notification
+      // stream, which respects the ringer volume).
+      await androidImpl?.createNotificationChannel(
+        const AndroidNotificationChannel(
+          _alarmChannelId,
+          _alarmChannelName,
+          description: _alarmChannelDesc,
+          importance: Importance.max,
+          playSound: true,
+          enableVibration: true,
+          enableLights: true,
+          audioAttributesUsage: AudioAttributesUsage.alarm,
+          bypassDnd: true,
         ),
       );
 
@@ -131,25 +164,123 @@ class AlarmService {
   static int alarmNotificationId(int rawId, int dayIdx) =>
       ((rawId.abs() % 100000) * 7) + dayIdx.clamp(0, 6);
 
+  /// Alarm-style notification: routed to the alarm audio stream and allowed
+  /// past Do Not Disturb so it is audible in silent/vibrate mode.  The sound
+  /// loops (FLAG_INSISTENT) until the user taps "Dismiss".
   static NotificationDetails _alarmDetails({bool fullScreen = true}) =>
       NotificationDetails(
         android: AndroidNotificationDetails(
-          _channelId,
-          _channelName,
-          channelDescription: _channelDesc,
+          _alarmChannelId,
+          _alarmChannelName,
+          channelDescription: _alarmChannelDesc,
           importance: Importance.max,
           priority: Priority.high,
           playSound: true,
           enableVibration: true,
+          vibrationPattern: Int64List.fromList(const [0, 800, 500, 800, 500, 800]),
           fullScreenIntent: fullScreen,
           category: AndroidNotificationCategory.alarm,
           visibility: NotificationVisibility.public,
+          audioAttributesUsage: AudioAttributesUsage.alarm,
+          // Without this the alarm respects the ringer volume and is silent
+          // whenever the phone is on silent/vibrate.  (`bypassDnd` is a
+          // channel-only setting and is applied in init().)
+          ongoing: true,
+          autoCancel: false,
+          // FLAG_INSISTENT (4) — sound loops until dismissed.
+          additionalFlags: Int32List.fromList(const [4]),
+          actions: [
+            const AndroidNotificationAction(
+              'alarm_dismiss',
+              'Dismiss',
+              cancelNotification: true,
+            ),
+          ],
         ),
         iOS: const DarwinNotificationDetails(
           presentAlert: true,
           presentSound: true,
         ),
       );
+
+  /// Ordinary reminder: respects the ringer, no full-screen takeover.
+  static NotificationDetails _reminderDetails() => NotificationDetails(
+        android: AndroidNotificationDetails(
+          _reminderChannelId,
+          _reminderChannelName,
+          channelDescription: _reminderChannelDesc,
+          importance: Importance.max,
+          priority: Priority.high,
+          playSound: true,
+          enableVibration: true,
+          category: AndroidNotificationCategory.reminder,
+          visibility: NotificationVisibility.public,
+          audioAttributesUsage: AudioAttributesUsage.notification,
+        ),
+        iOS: const DarwinNotificationDetails(
+          presentAlert: true,
+          presentSound: true,
+        ),
+      );
+
+  /// Channel used for admin/system messages from the `notifications` table.
+  static const _adminChannelId = 'imu_admin_v2';
+  static const _adminChannelName = 'Announcements';
+  static const _adminChannelDesc = 'Messages sent to you by your institute';
+
+  static Future<void> _ensureAdminChannel() async {
+    try {
+      final androidImpl = _plugin.resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>();
+      await androidImpl?.createNotificationChannel(
+        const AndroidNotificationChannel(
+          _adminChannelId,
+          _adminChannelName,
+          description: _adminChannelDesc,
+          importance: Importance.high,
+          playSound: true,
+          enableVibration: true,
+          audioAttributesUsage: AudioAttributesUsage.notification,
+        ),
+      );
+    } catch (_) {
+      // channel creation is best-effort
+    }
+  }
+
+  /// Posts an admin/system inbox message as a real notification, so a message
+  /// sent from the admin panel is seen and heard without a push service.
+  static Future<void> showInboxNotification({
+    required int id,
+    required String title,
+    required String body,
+  }) async {
+    if (!_initialized) await init();
+    await _ensureAdminChannel();
+    await _plugin.show(
+      id,
+      title,
+      body,
+      NotificationDetails(
+        android: AndroidNotificationDetails(
+          _adminChannelId,
+          _adminChannelName,
+          channelDescription: _adminChannelDesc,
+          importance: Importance.high,
+          priority: Priority.high,
+          playSound: true,
+          enableVibration: true,
+          styleInformation: BigTextStyleInformation(body),
+          category: AndroidNotificationCategory.message,
+          visibility: NotificationVisibility.public,
+        ),
+        iOS: const DarwinNotificationDetails(
+          presentAlert: true,
+          presentSound: true,
+        ),
+      ),
+    );
+  }
 
   /// Schedules, downgrading to an inexact alarm when the OS denies exact
   /// alarms instead of throwing and losing the reminder entirely.
@@ -158,9 +289,10 @@ class AlarmService {
     String title,
     String body,
     tz.TZDateTime when,
-    DateTimeComponents? repeat,
-  ) async {
-    final details = _alarmDetails();
+    DateTimeComponents? repeat, {
+    NotificationDetails? detailsOverride,
+  }) async {
+    final details = detailsOverride ?? _alarmDetails();
     try {
       await _plugin.zonedSchedule(
         id,
@@ -223,6 +355,7 @@ class AlarmService {
       reminder['body']!,
       remindAt,
       DateTimeComponents.dayOfWeekAndTime,
+      detailsOverride: _reminderDetails(),
     );
 
     final starting = _buildDetails(cls, isReminder: false);
@@ -232,6 +365,7 @@ class AlarmService {
       starting['body']!,
       when,
       DateTimeComponents.dayOfWeekAndTime,
+      detailsOverride: _reminderDetails(),
     );
   }
 
@@ -346,7 +480,7 @@ class AlarmService {
     required String body,
   }) async {
     if (!_initialized) await init();
-    await _plugin.show(id, title, body, _alarmDetails(fullScreen: false));
+    await _plugin.show(id, title, body, _reminderDetails());
   }
 
   static Future<void> cancelClass(ClassSchedule cls) async {

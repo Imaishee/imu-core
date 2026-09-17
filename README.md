@@ -1,4 +1,4 @@
-# IM'U — AI Study Companion
+# I'MU — AI Study Companion
 
 A full-stack AI-powered study platform with Android app, admin panel, and serverless backend.
 

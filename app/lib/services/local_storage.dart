@@ -11,6 +11,7 @@ class LocalStorage {
     final prefs = await SharedPreferences.getInstance();
     final jsonList = conversations.map((c) => {
       'remoteId': c.remoteId,
+      'supabaseId': c.supabaseId,
       'title': c.title,
       'model': c.model,
       'isArchived': c.isArchived,
@@ -28,6 +29,7 @@ class LocalStorage {
     final jsonList = List<Map<String, dynamic>>.from(jsonDecode(data));
     return jsonList.map((j) => Conversation(
       remoteId: j['remoteId'],
+      supabaseId: j['supabaseId'],
       title: j['title'],
       model: j['model'] ?? 'openai/gpt-oss-20b',
       isArchived: j['isArchived'] ?? false,

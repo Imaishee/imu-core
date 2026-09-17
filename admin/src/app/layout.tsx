@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: "IM'U Admin Panel",
+  title: "I'MU Admin Panel",
   description: 'Manage users, notifications, and AI settings',
 };
 

@@ -24,7 +24,7 @@ export default function Sidebar() {
             <span className="text-black font-bold text-xs">IM</span>
           </div>
           <div>
-            <h1 className="text-sm font-semibold text-white">IM'U Admin</h1>
+            <h1 className="text-sm font-semibold text-white">I'MU Admin</h1>
             <p className="text-xs text-zinc-500">Management Panel</p>
           </div>
         </div>

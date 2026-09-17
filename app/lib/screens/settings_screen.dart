@@ -334,17 +334,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         gradient: const LinearGradient(colors: [AppColors.greenPrimary, AppColors.greenLight], begin: Alignment.topLeft, end: Alignment.bottomRight),
                         borderRadius: BorderRadius.circular(16),
                       ),
-                      child: const Center(child: Text('IM', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18))),
+                      child: const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(11),
+                          child: FittedBox(
+                            child: Text("I'MU", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                          ),
+                        ),
+                      ),
                     ),
                     const SizedBox(height: 14),
-                    Text('IM\'U', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppTheme.textMain)),
+                    Text('I\'MU', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppTheme.textMain)),
                     Text('Your AI study companion', style: TextStyle(color: AppTheme.textMuted, fontSize: 13)),
                     const SizedBox(height: 16),
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(color: AppColors.greenMint.withAlpha(40), borderRadius: BorderRadius.circular(14)),
                       child: Text(
-                        'IM\'U helps you study smarter with a caring AI partner who knows your schedule, your courses, and always has your back.',
+                        'I\'MU helps you study smarter with a caring AI partner who knows your schedule, your courses, and always has your back.',
                         textAlign: TextAlign.center,
                         style: TextStyle(color: AppTheme.textMuted, fontSize: 12, fontStyle: FontStyle.italic),
                       ),
@@ -354,7 +361,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     const SizedBox(height: 4),
                     Text('SHUBHAM MALLICK', style: TextStyle(color: AppColors.greenPrimary, fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 0.8)),
                     const SizedBox(height: 4),
-                    Text('IM\'U v${AppConstants.appVersion}', style: TextStyle(color: AppTheme.textMuted, fontSize: 11)),
+                    Text('I\'MU v${AppConstants.appVersion}', style: TextStyle(color: AppTheme.textMuted, fontSize: 11)),
                   ],
                 ),
               ),

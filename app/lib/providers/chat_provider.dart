@@ -3,6 +3,7 @@ import '../models/chat_message.dart';
 import '../models/conversation.dart';
 import '../services/ai_actions_service.dart';
 import '../services/chat_service.dart';
+import '../services/chat_sync_service.dart';
 import '../services/local_storage.dart';
 import 'app_provider.dart';
 
@@ -49,10 +50,12 @@ class ConversationsNotifier extends Notifier<List<Conversation>> {
   Conversation create() {
     final convo = Conversation(
       remoteId: DateTime.now().millisecondsSinceEpoch.toString(),
+      supabaseId: generateUuid(),
       title: 'New Chat',
     );
     state = [convo, ...state];
     _save();
+    ChatSyncService.syncConversation(convo);
     return convo;
   }
 
@@ -64,6 +67,9 @@ class ConversationsNotifier extends Notifier<List<Conversation>> {
       }
     }
     _save();
+    final convo = state.firstWhere((c) => c.remoteId == id,
+        orElse: () => Conversation(remoteId: '', title: ''));
+    ChatSyncService.syncTitle(convo.supabaseId, title);
   }
 
   void delete(String id) {
@@ -180,6 +186,17 @@ class MessagesNotifier extends Notifier<List<ChatMessage>> {
             ),
           ];
           ref.read(localStorageProvider).saveMessages(_conversationId, state);
+          // Sync conversation and messages to Supabase for admin visibility.
+          final convo = ref
+              .read(conversationsProvider)
+              .where((c) => c.remoteId == _conversationId)
+              .firstOrNull;
+          if (convo != null) {
+            ChatSyncService.syncConversation(convo);
+            for (final m in state) {
+              ChatSyncService.syncMessage(convo.supabaseId, m);
+            }
+          }
           return;
         }
       } catch (_) {
@@ -256,5 +273,17 @@ class MessagesNotifier extends Notifier<List<ChatMessage>> {
 
     // Save after streaming finishes
     ref.read(localStorageProvider).saveMessages(_conversationId, state);
+
+    // Sync to Supabase for admin visibility.
+    final convo = ref
+        .read(conversationsProvider)
+        .where((c) => c.remoteId == _conversationId)
+        .firstOrNull;
+    if (convo != null) {
+      ChatSyncService.syncConversation(convo);
+      for (final m in state) {
+        ChatSyncService.syncMessage(convo.supabaseId, m);
+      }
+    }
   }
 }

@@ -96,7 +96,14 @@ class _AuthScreenState extends State<AuthScreen> {
                     gradient: const LinearGradient(colors: [AppColors.greenPrimary, AppColors.greenLight], begin: Alignment.topLeft, end: Alignment.bottomRight),
                     borderRadius: BorderRadius.circular(22),
                   ),
-                  child: const Center(child: Text('IM', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 24))),
+                  child: const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(14),
+                      child: FittedBox(
+                        child: Text("I'MU", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 20),
                 Text(

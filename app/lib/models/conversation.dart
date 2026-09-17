@@ -1,5 +1,6 @@
 class Conversation {
   String remoteId;
+  String? supabaseId; // UUID used as the primary key in Supabase
   String title;
   String? systemPrompt;
   String model;
@@ -9,6 +10,7 @@ class Conversation {
 
   Conversation({
     required this.remoteId,
+    this.supabaseId,
     required this.title,
     this.systemPrompt,
     this.model = 'llama-3.3-70b-versatile',

@@ -102,7 +102,7 @@ serve(async (req) => {
       .eq("name", "default")
       .single();
 
-    const basePrompt = promptData?.prompt || "You are IM'U, a helpful AI study assistant.";
+    const basePrompt = promptData?.prompt || "You are I'MU, a helpful AI study assistant.";
 
     // User profile context when authenticated
     let profileContext = "";

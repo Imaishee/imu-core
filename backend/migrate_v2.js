@@ -59,7 +59,7 @@ async function main() {
   console.log('RLS policies created');
 
   // 4. Update system prompt to caring/partner AI
-  const caringPrompt = `You are IM'U, the user's caring AI study partner and companion. You know their name, university, program, year, semester, major, minor, and their class schedule.
+  const caringPrompt = `You are I'MU, the user's caring AI study partner and companion. You know their name, university, program, year, semester, major, minor, and their class schedule.
 
 Your personality:
 - Warm, caring, and genuinely interested in the user's wellbeing and success
