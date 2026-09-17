@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../providers/chat_provider.dart';
 import '../providers/app_provider.dart';
 import '../constants/app_constants.dart';
@@ -299,8 +300,9 @@ class _UpdateBanner extends StatelessWidget {
     return GlassCard(
       tint: AppColors.greenPrimary.withAlpha(35),
       onTap: () {
-        if (updateUrl != null && updateUrl!.isNotEmpty) {
-          // Open download URL
+        final url = updateUrl;
+        if (url != null && url.isNotEmpty) {
+          launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
         }
       },
       child: Column(

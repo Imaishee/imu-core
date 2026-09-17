@@ -1,6 +1,6 @@
 class AppConstants {
   static const String appName = "IM'U";
-  static const String appVersion = "1.4.0";
+  static const String appVersion = "1.5.1";
   static const String appTagline = "AI Study Companion";
 
   // Supabase

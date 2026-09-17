@@ -1,4 +1,5 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import '../models/class_schedule.dart';
@@ -18,8 +19,19 @@ class AlarmService {
   /// Must be called once in main() before any scheduling.
   static Future<void> init() async {
     if (_initialized) return;
-    tz.initializeTimeZones();
     try {
+      tz.initializeTimeZones();
+      // Without this, tz.local stays UTC and zonedSchedule computes wrong
+      // times (or skips alarms entirely). Resolve the device zone by name.
+      try {
+        final deviceZone = await FlutterTimezone.getLocalTimezone();
+        tz.setLocalLocation(tz.getLocation(deviceZone));
+      } catch (_) {
+        // Fall back to an offset guess if the plugin is unavailable.
+        final offset = DateTime.now().timeZoneOffset;
+        tz.setLocalLocation(tz.getLocation('Etc/GMT${offset.isNegative ? '+' : '-'}${offset.inHours.abs()}'));
+      }
+
       const android = AndroidInitializationSettings('@mipmap/ic_launcher');
       const ios = DarwinInitializationSettings(
         requestAlertPermission: true,

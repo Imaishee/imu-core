@@ -60,16 +60,34 @@ void main() async {
     print('Supabase init skipped: $e');
   }
 
-  // Request core permission
-  await PermissionService.requestCorePermissions();
-
-  // Initialize native alarms
-  await AlarmService.init();
-
-  // Sync timetable from cloud when user is logged in
-  await TimetableService().mergeRemote();
-
+  // Render the app FIRST so a background init failure can never white-screen.
   runApp(const ProviderScope(child: ImuApp()));
+
+  // Heavy init runs after first frame; each step is guarded so a plugin
+  // throw (notifications, exact-alarm, cloud sync) can't crash startup.
+  await Future<void>.delayed(Duration.zero);
+  await _initializeBackgroundServices();
+}
+
+/// Best-effort background startup. Never throws to the caller.
+Future<void> _initializeBackgroundServices() async {
+  try {
+    await PermissionService.requestCorePermissions();
+  } catch (e) {
+    print('Permission request skipped: $e');
+  }
+
+  try {
+    await AlarmService.init();
+  } catch (e) {
+    print('Alarm init skipped: $e');
+  }
+
+  try {
+    await TimetableService().mergeRemote();
+  } catch (e) {
+    print('Timetable sync skipped: $e');
+  }
 }
 
 class ImuApp extends StatefulWidget {
@@ -97,6 +115,7 @@ class _ImuAppState extends State<ImuApp> {
   Future<void> _initApp() async {
     final prefs = await SharedPreferences.getInstance();
     final dark = prefs.getBool('dark_mode') ?? false;
+    AppTheme.setDark(dark);
     setState(() => _isDark = dark);
 
     // Check for updates in background
@@ -139,6 +158,7 @@ class _ImuAppState extends State<ImuApp> {
   void _toggleTheme() async {
     final prefs = await SharedPreferences.getInstance();
     final next = !_isDark;
+    AppTheme.setDark(next);
     await prefs.setBool('dark_mode', next);
     setState(() => _isDark = next);
   }
