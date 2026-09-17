@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:imu_app/main.dart';
+import 'package:imu_app/screens/auth_screen.dart';
 import 'package:imu_app/theme/app_theme.dart';
 
 void main() {
@@ -48,6 +52,27 @@ void main() {
     test('theme brightness matches request', () {
       expect(AppTheme.light.brightness, Brightness.light);
       expect(AppTheme.dark.brightness, Brightness.dark);
+    });
+  });
+
+  group('Startup smoke test', () {
+    testWidgets('ImuApp paints a frame and reaches AuthScreen even when '
+        'Supabase cannot initialize (no white screen)', (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      await tester.pumpWidget(const ProviderScope(child: ImuApp()));
+
+      // A frame must paint immediately — never a blank window.
+      expect(find.byType(MaterialApp), findsOneWidget);
+
+      // Let the guarded async init finish without pumpAndSettle (the
+      // loading spinner animates forever).
+      for (var i = 0; i < 6; i++) {
+        await tester.pump(const Duration(milliseconds: 200));
+      }
+
+      expect(tester.takeException(), isNull,
+          reason: 'startup must not throw when background services fail');
+      expect(find.byType(AuthScreen), findsOneWidget);
     });
   });
 }

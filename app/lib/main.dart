@@ -8,7 +8,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'constants/app_constants.dart';
 import 'theme/app_theme.dart';
-import 'providers/app_provider.dart';
 import 'services/alarm_service.dart';
 import 'services/permission_service.dart';
 import 'services/timetable_service.dart';
@@ -116,28 +115,19 @@ class _ImuAppState extends State<ImuApp> {
     final prefs = await SharedPreferences.getInstance();
     final dark = prefs.getBool('dark_mode') ?? false;
     AppTheme.setDark(dark);
-    setState(() => _isDark = dark);
 
-    // Check for updates in background
+    // Unblock the first screen as soon as local prefs are read. Never gate
+    // the UI on a network call — a slow/hanging Supabase request would leave
+    // the user staring at a spinner (indistinguishable from a white screen).
+    if (mounted) {
+      setState(() {
+        _isDark = dark;
+        _initDone = true;
+      });
+    }
+
+    // Fire-and-forget update check.
     _checkUpdate();
-
-    // Rebuild alarms from local timetable
-    UserProfile? profile;
-    try {
-      final profileData = await Supabase.instance.client
-          .from('public.profiles')
-          .select()
-          .eq('id', Supabase.instance.client.auth.currentUser?.id ?? '')
-          .maybeSingle();
-      if (profileData != null) {
-        profile = UserProfile.fromMap(profileData);
-      }
-    } catch (_) {}
-
-    setState(() {
-      _isDark = dark;
-      _initDone = true;
-    });
   }
 
   Future<void> _checkUpdate() async {
@@ -153,6 +143,16 @@ class _ImuAppState extends State<ImuApp> {
         _forceUpdate = resp.data['force_update'] ?? false;
       }
     } catch (_) {}
+  }
+
+  /// Reads the current auth session without throwing if Supabase failed to
+  /// initialize — a throw here would surface as a white screen.
+  Session? _currentSession() {
+    try {
+      return Supabase.instance.client.auth.currentSession;
+    } catch (_) {
+      return null;
+    }
   }
 
   void _toggleTheme() async {
@@ -175,7 +175,7 @@ class _ImuAppState extends State<ImuApp> {
       );
     }
 
-    final session = Supabase.instance.client.auth.currentSession;
+    final session = _currentSession();
 
     return MaterialApp(
       title: "IM'U — Study Companion",
@@ -183,7 +183,18 @@ class _ImuAppState extends State<ImuApp> {
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       themeMode: _isDark ? ThemeMode.dark : ThemeMode.light,
-      initialRoute: session != null ? '/home' : '/auth',
+      // `home` (not `initialRoute`) is required: Flutter's initial-route
+      // generation walks the '/' prefix and throws a null-check error when
+      // no '/' route exists, which white-screens the app on launch.
+      home: session != null
+          ? HomeScreen(
+              onToggleTheme: _toggleTheme,
+              latestVersion: _latestVersion,
+              updateUrl: _updateUrl,
+              updateNotes: _updateNotes,
+              forceUpdate: _forceUpdate,
+            )
+          : const AuthScreen(),
       routes: {
         '/home': (_) => HomeScreen(
               onToggleTheme: _toggleTheme,
