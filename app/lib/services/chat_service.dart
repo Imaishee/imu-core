@@ -32,6 +32,7 @@ class ChatService {
   Stream<Map<String, dynamic>> streamChat({
     required List<Map<String, String>> messages,
     String? conversationId,
+    Map<String, dynamic>? context,
   }) async* {
     final headers = <String, String>{
       'Content-Type': 'application/json',
@@ -51,6 +52,7 @@ class ChatService {
     request.body = jsonEncode({
       'messages': messages,
       if (conversationId != null) 'conversation_id': conversationId,
+      if (context != null) 'context': context,
       'model': AppConstants.defaultModel,
     });
 

@@ -5,6 +5,7 @@ import '../services/ai_actions_service.dart';
 import '../services/chat_service.dart';
 import '../services/chat_sync_service.dart';
 import '../services/local_storage.dart';
+import '../services/timetable_service.dart';
 import 'app_provider.dart';
 
 final chatServiceProvider = Provider((ref) => ChatService());
@@ -199,8 +200,19 @@ class MessagesNotifier extends Notifier<List<ChatMessage>> {
           }
           return;
         }
-      } catch (_) {
-        // fall through to normal chat
+      } catch (e) {
+        // Scheduling failed — show error to user instead of silently falling through
+        ref.read(thinkingStatusProvider.notifier).state = null;
+        state = [
+          ...state,
+          ChatMessage(
+            conversationId: _conversationId,
+            role: 'assistant',
+            content: 'Failed to apply change: $e. Please try again.',
+          ),
+        ];
+        ref.read(localStorageProvider).saveMessages(_conversationId, state);
+        return;
       } finally {
         ref.read(thinkingStatusProvider.notifier).state = null;
       }
@@ -214,9 +226,40 @@ class MessagesNotifier extends Notifier<List<ChatMessage>> {
           .map((m) => {'role': m.role, 'content': m.content})
           .toList();
 
+      // Build timetable + alarm context so the AI can answer schedule questions.
+      final Map<String, dynamic> chatContext = {};
+      try {
+        final classes = await TimetableService().loadLocal();
+        if (classes.isNotEmpty) {
+          chatContext['classes'] = classes.map((c) => {
+            'course_name': c.courseName,
+            'course_code': c.courseCode,
+            'day': c.day,
+            'start_time': c.startTime,
+            'end_time': c.endTime,
+            'room': c.room,
+            'instructor': c.instructor,
+          }).toList();
+        }
+      } catch (_) {}
+      try {
+        final alarms = await AiActionsService.loadAlarms();
+        if (alarms.isNotEmpty) {
+          chatContext['alarms'] = alarms.map((a) => {
+            'label': a.label,
+            'time': a.time,
+            'days': a.days,
+          }).toList();
+        }
+      } catch (_) {}
+
       await for (final event in ref
           .read(chatServiceProvider)
-          .streamChat(messages: apiMessages, conversationId: _conversationId)) {
+          .streamChat(
+            messages: apiMessages,
+            conversationId: _conversationId,
+            context: chatContext.isNotEmpty ? chatContext : null,
+          )) {
         final type = event['type'];
 
         if (type == 'status') {

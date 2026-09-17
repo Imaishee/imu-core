@@ -63,7 +63,7 @@ export async function getActivityLog() {
   const supabase = getClient();
   const { data, error } = await supabase
     .from('activity_log')
-    .select('*, profiles!inner(name)')
+    .select('*')
     .order('created_at', { ascending: false })
     .limit(100);
   return { data: data || [], error };

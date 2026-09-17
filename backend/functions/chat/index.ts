@@ -92,7 +92,7 @@ serve(async (req) => {
       } catch {}
     }
 
-    const { messages, conversation_id, model = "openai/gpt-oss-20b" } = await req.json();
+    const { messages, conversation_id, model = "openai/gpt-oss-20b", context } = await req.json();
 
     // Fetch active system prompt
     const { data: promptData } = await supabase
@@ -136,6 +136,24 @@ serve(async (req) => {
     }
 
     let systemPrompt = basePrompt + profileContext + knowledgeContext;
+
+    // Timetable + alarm context from the client
+    if (context && typeof context === "object") {
+      const classes = Array.isArray(context.classes) ? context.classes : [];
+      const alarms = Array.isArray(context.alarms) ? context.alarms : [];
+      if (classes.length) {
+        systemPrompt += `\n\nUSER'S WEEKLY TIMETABLE:\n${classes.map((c: any) =>
+          `- ${c.course_name}${c.course_code ? ` (${c.course_code})` : ""} on ${c.day} ${c.start_time}-${c.end_time}${c.room ? ` in ${c.room}` : ""}${c.instructor ? ` with ${c.instructor}` : ""}`,
+        ).join("\n")}\n\nWhen the user asks about their schedule, classes, or timetable, answer from this data. For requests to add/remove/edit classes or set/delete alarms, reply with a brief confirmation — the app handles the actual changes automatically.`;
+      } else {
+        systemPrompt += `\n\nUSER'S TIMETABLE: (empty — no classes added yet)\n\nWhen the user wants to add classes, tell them you'll set it up. The app handles the actual changes automatically.`;
+      }
+      if (alarms.length) {
+        systemPrompt += `\n\nUSER'S ALARMS:\n${alarms.map((a: any) =>
+          `- "${a.label}" at ${a.time}${Array.isArray(a.days) && a.days.length ? ` on days ${a.days.join(",")}` : " (one-time)"}`,
+        ).join("\n")}`;
+      }
+    }
 
     // =========== WEB SEARCH LOGIC ===========
     const lastUserMsg = messages[messages.length - 1];
