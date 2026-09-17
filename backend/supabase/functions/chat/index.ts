@@ -26,15 +26,29 @@ function needsWebSearch(text: string): boolean {
     "latest", "news", "today", "current", "price", "weather", "who is", "who won",
     "recent", "search", "find", "look up", "what happened", "when did",
     "stock", "score", "result", "trending", "best", "top", "review", "compare",
+    " happening", "update", " breaking",
   ];
   return keywords.some(kw => lower.includes(kw));
 }
 
+// Multi-source web search: try DuckDuckGo first, then SearXNG fallback
 async function webSearch(query: string): Promise<string> {
+  // Try DuckDuckGo HTML scraping (free, no API key)
+  const ddgResults = await searchDuckDuckGo(query);
+  if (ddgResults) return ddgResults;
+
+  // Fallback: try public SearXNG instance
+  const searxResults = await searchSearXNG(query);
+  if (searxResults) return searxResults;
+
+  return "";
+}
+
+async function searchDuckDuckGo(query: string): Promise<string> {
   try {
     const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
     const resp = await fetch(url, {
-      headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" },
+      headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" },
       signal: AbortSignal.timeout(8000),
     });
     if (!resp.ok) return "";
@@ -45,7 +59,29 @@ async function webSearch(query: string): Promise<string> {
     for (let i = 0; i < Math.min(aMatches.length, 5); i++) {
       const title = aMatches[i].replace(/<[^>]+>/g, "").trim();
       const snippet = sMatches[i] ? sMatches[i].replace(/<[^>]+>/g, "").trim() : "";
-      results.push(`${i + 1}. ${title}\n${snippet}`);
+      if (title) results.push(`${i + 1}. ${title}\n${snippet}`);
+    }
+    return results.join("\n\n");
+  } catch { return ""; }
+}
+
+async function searchSearXNG(query: string): Promise<string> {
+  try {
+    // Try a public SearXNG instance (no API key needed)
+    const url = `https://search.inetol.net/search?q=${encodeURIComponent(query)}&format=json&categories=general`;
+    const resp = await fetch(url, {
+      headers: { "Accept": "application/json" },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!resp.ok) return "";
+    const data = await resp.json();
+    const results: string[] = [];
+    if (data.results) {
+      for (const r of data.results.slice(0, 5)) {
+        if (r.title && r.content) {
+          results.push(`${results.length + 1}. ${r.title}\n${r.content.substring(0, 200)}`);
+        }
+      }
     }
     return results.join("\n\n");
   } catch { return ""; }
@@ -160,17 +196,40 @@ serve(async (req) => {
       } catch {}
     }
 
-    // Knowledge context
+    // Knowledge context — keyword-matched RAG retrieval
     let knowledgeContext = "";
     if (userId) {
-      const { data: kn } = await supabase
-        .from("knowledge_nodes")
-        .select("label, node_type, content")
-        .eq("user_id", userId)
-        .order("updated_at", { ascending: false })
-        .limit(10);
-      if (kn && kn.length > 0) {
-        knowledgeContext = "\nKnowledge:\n" + kn.map((n: any) => `- ${n.label} (${n.node_type})`).join("\n");
+      const lastMsg = messages[messages.length - 1]?.content?.toString() || "";
+      // Extract meaningful keywords (3+ chars, skip common words)
+      const stopWords = new Set(["the","this","that","with","from","your","have","will","what","when","where","which","about","would","could","should","their","there","been","have","does","don","just","also","like","more","than","into","your","some","could","would","should","very","much"]);
+      const words = lastMsg.toLowerCase().replace(/[^a-z0-9\s]/g, "").split(/\s+/).filter(w => w.length >= 3 && !stopWords.has(w));
+      const uniqueWords = [...new Set(words)].slice(0, 8);
+
+      if (uniqueWords.length > 0) {
+        // Search knowledge_nodes for matching labels or content
+        const { data: kn } = await supabase
+          .from("knowledge_nodes")
+          .select("label, node_type, content")
+          .eq("user_id", userId)
+          .order("updated_at", { ascending: false })
+          .limit(50);
+
+        if (kn && kn.length > 0) {
+          // Score each node by keyword overlap
+          const scored = kn.map((n: any) => {
+            const text = `${n.label} ${n.content || ""}`.toLowerCase();
+            const score = uniqueWords.filter(w => text.includes(w)).length;
+            return { ...n, score };
+          }).filter((n: any) => n.score > 0)
+            .sort((a: any, b: any) => b.score - a.score)
+            .slice(0, 5);
+
+          if (scored.length > 0) {
+            knowledgeContext = "\nRelevant Knowledge:\n" + scored.map((n: any) =>
+              `- ${n.label} (${n.node_type}): ${(n.content || "").substring(0, 200)}`
+            ).join("\n");
+          }
+        }
       }
     }
 

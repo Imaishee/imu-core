@@ -50,6 +50,9 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Low-end device: limit image cache to 50MB (default is 100MB)
+  PaintingBinding.instance.imageCache.maximumSizeBytes = 50 * 1024 * 1024;
+
   // Lock portrait — app is portrait-first
   SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,

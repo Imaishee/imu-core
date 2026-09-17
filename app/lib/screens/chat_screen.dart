@@ -205,6 +205,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         ListView.builder(
                           controller: _scrollController,
                           padding: EdgeInsets.symmetric(horizontal: isCompact ? 10 : 16, vertical: 12),
+                          addAutomaticKeepAlives: false,
+                          addRepaintBoundaries: true,
                         itemCount: messages.length + (thinking != null ? 1 : 0),
                         itemBuilder: (context, index) {
                           if (index == messages.length && thinking != null) {
@@ -456,8 +458,8 @@ class _MessageWidget extends StatelessWidget {
     final content = message.content as String? ?? '';
     if (content.isEmpty && !isStreaming) return const SizedBox.shrink();
 
-    if (isUser) return _UserMessage(content: content, screenWidth: screenWidth, onEdit: onEdit, onResend: onResend);
-    return _AiMessage(content: content, isStreaming: isStreaming, isLast: isLast, screenWidth: screenWidth);
+    if (isUser) return RepaintBoundary(child: _UserMessage(content: content, screenWidth: screenWidth, onEdit: onEdit, onResend: onResend));
+    return RepaintBoundary(child: _AiMessage(content: content, isStreaming: isStreaming, isLast: isLast, screenWidth: screenWidth));
   }
 }
 
