@@ -1,7 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:imu_app/models/alarm_item.dart';
 import 'package:imu_app/models/class_schedule.dart';
-import 'package:imu_app/providers/chat_provider.dart';
 import 'package:imu_app/services/ai_actions_service.dart';
 import 'package:imu_app/services/alarm_service.dart';
 
@@ -145,23 +144,6 @@ void main() {
           isFalse);
       expect(AiActionsService.isDuplicate(existing, cls('CSE201', 'Monday', '11:00')),
           isFalse);
-    });
-  });
-
-  group('Chat scheduling intent gate', () {
-    test('routes scheduling-shaped messages to the action endpoint', () {
-      expect(MessagesNotifier.looksLikeScheduling('set an alarm for 7am'), isTrue);
-      expect(MessagesNotifier.looksLikeScheduling('add Data Structures on Monday'),
-          isTrue);
-      expect(MessagesNotifier.looksLikeScheduling('here is my timetable'), isTrue);
-      expect(MessagesNotifier.looksLikeScheduling('remind me to study at 9'), isTrue);
-      expect(MessagesNotifier.looksLikeScheduling('delete my class'), isTrue);
-    });
-
-    test('leaves ordinary chat on the streaming path', () {
-      expect(MessagesNotifier.looksLikeScheduling('explain recursion'), isFalse);
-      expect(MessagesNotifier.looksLikeScheduling('what is a stack'), isFalse);
-      expect(MessagesNotifier.looksLikeScheduling('write me an essay'), isFalse);
     });
   });
 

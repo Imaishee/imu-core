@@ -151,11 +151,11 @@ serve(async (req) => {
       try {
         const { data: prof } = await supabase
           .from("profiles")
-          .select("name, programme, year, semester, major, minor, university")
+          .select("name, programme, year, semester, university")
           .eq("id", userId)
           .single();
         if (prof) {
-          profileContext = `\nUser: ${prof.name}. Uni: ${prof.university}. Programme: ${prof.programme}. Year ${prof.year} Sem ${prof.semester}. Major: ${prof.major}.`;
+          profileContext = `\nUser: ${prof.name}. Uni: ${prof.university}. Programme: ${prof.programme}. Year ${prof.year} Sem ${prof.semester}.`;
         }
       } catch {}
     }

@@ -5,6 +5,7 @@ import '../providers/chat_provider.dart';
 import '../providers/app_provider.dart';
 import '../constants/app_constants.dart';
 import '../theme/app_theme.dart';
+import '../theme/app_widgets.dart';
 import 'chat_screen.dart';
 import 'settings_screen.dart';
 import 'alarms_screen.dart';
@@ -63,6 +64,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return Scaffold(
       backgroundColor: AppTheme.bg,
       body: SafeArea(
+        child: CutePatternBackground(
         child: CustomScrollView(
           slivers: [
             // App bar
@@ -93,13 +95,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ]),
               actions: [
                 _iconBtn(Icons.notifications_outlined, widget.unreadNotifications > 0 ? Colors.redAccent : AppTheme.textMain, () {
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationsScreen()));
+                  Navigator.push(context, SlideUpRoute(page: const NotificationsScreen()));
                 }),
                 _iconBtn(Icons.schedule_outlined, AppTheme.textMain, () {
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => const TimetableScreen()));
+                  Navigator.push(context, SlideUpRoute(page: const TimetableScreen()));
                 }),
                 _iconBtn(Icons.settings_outlined, AppTheme.textMain, () {
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => SettingsScreen(onToggleTheme: widget.onToggleTheme)));
+                  Navigator.push(context, SlideUpRoute(page: SettingsScreen(onToggleTheme: widget.onToggleTheme)));
                 }),
               ],
             ),
@@ -137,16 +139,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             _quickAction(Icons.chat_bubble_outline, 'New Chat', AppColors.greenPrimary, () {
                               final convo = ref.read(conversationsProvider.notifier).create();
                               ref.read(activeConversationProvider.notifier).set(convo.remoteId);
-                              Navigator.push(context, MaterialPageRoute(builder: (_) => ChatScreen(conversationId: convo.remoteId)));
+                              Navigator.push(context, SlideUpRoute(page: ChatScreen(conversationId: convo.remoteId)));
                             }),
                             _quickAction(Icons.school_outlined, 'Timetable', const Color(0xFF2D6A4F), () {
-                              Navigator.push(context, MaterialPageRoute(builder: (_) => const TimetableScreen()));
+                              Navigator.push(context, SlideUpRoute(page: const TimetableScreen()));
                             }),
                             _quickAction(Icons.alarm_add_outlined, 'Alarms', const Color(0xFF52B788), () {
-                              Navigator.push(context, MaterialPageRoute(builder: (_) => const AlarmsScreen()));
+                              Navigator.push(context, SlideUpRoute(page: const AlarmsScreen()));
                             }),
                             _quickAction(Icons.camera_alt_outlined, 'Scan Schedule', const Color(0xFF40916C), () {
-                              Navigator.push(context, MaterialPageRoute(builder: (_) => const TimetableScreen()));
+                              Navigator.push(context, SlideUpRoute(page: const TimetableScreen()));
                             }),
                           ],
                         ),
@@ -161,7 +163,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     final next = ref.watch(nextClassProvider);
                     if (next == null) return const SizedBox.shrink();
                     return GlassCard(
-                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TimetableScreen())),
+                      onTap: () => Navigator.push(context, SlideUpRoute(page: const TimetableScreen())),
                       child: Row(children: [
                         Container(
                           width: 44, height: 44,
@@ -193,7 +195,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         if (convos.isNotEmpty)
                           GestureDetector(
                             onTap: () {
-                              Navigator.push(context, MaterialPageRoute(builder: (_) => const ChatHistoryScreen()));
+                              Navigator.push(context, SlideUpRoute(page: const ChatHistoryScreen()));
                             },
                             child: Row(children: [
                               Icon(Icons.history, size: 14, color: AppColors.greenLight),
@@ -226,11 +228,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ],
         ),
       ),
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
           final convo = ref.read(conversationsProvider.notifier).create();
           ref.read(activeConversationProvider.notifier).set(convo.remoteId);
-          Navigator.push(context, MaterialPageRoute(builder: (_) => ChatScreen(conversationId: convo.remoteId)));
+          Navigator.push(context, SlideUpRoute(page: ChatScreen(conversationId: convo.remoteId)));
         },
         backgroundColor: AppColors.greenPrimary,
         icon: const Icon(Icons.chat, color: Colors.white),
@@ -261,7 +264,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         margin: EdgeInsets.zero,
         onTap: () {
           ref.read(activeConversationProvider.notifier).set(convo.remoteId);
-          Navigator.push(context, MaterialPageRoute(builder: (_) => ChatScreen(conversationId: convo.remoteId)));
+          Navigator.push(context, SlideUpRoute(page: ChatScreen(conversationId: convo.remoteId)));
         },
         child: Row(children: [
           Container(

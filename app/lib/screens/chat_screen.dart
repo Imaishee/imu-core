@@ -10,6 +10,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../providers/chat_provider.dart';
 import '../services/voice_service.dart';
 import '../theme/app_theme.dart';
+import '../theme/app_widgets.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
   final String conversationId;
@@ -26,6 +27,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   final _voiceService = VoiceService();
   bool _isStreaming = false;
   File? _pendingImage;
+  bool _showGoToBottom = false;
+
+  // Click-to-talk state
+  bool _isRecording = false;
+  String _voiceText = '';
 
   // Scroll debounce
   Timer? _scrollTimer;
@@ -34,6 +40,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   void initState() {
     super.initState();
     _voiceService.initialize();
+    _scrollController.addListener(_onScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (widget.initialPrompt != null && widget.initialPrompt!.isNotEmpty) {
         _inputController.text = widget.initialPrompt!;
@@ -51,12 +58,25 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     super.dispose();
   }
 
-  void _scrollToBottom() {
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    final atBottom = _scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 80;
+    if (atBottom != !_showGoToBottom) {
+      setState(() => _showGoToBottom = !atBottom);
+    }
+  }
+
+  void _scrollToBottom({bool animate = true}) {
     _scrollTimer?.cancel();
-    _scrollTimer = Timer(const Duration(milliseconds: 300), () {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(_scrollController.position.maxScrollExtent,
-            duration: const Duration(milliseconds: 200), curve: Curves.easeOut);
+    _scrollTimer = Timer(const Duration(milliseconds: 100), () {
+      if (!_scrollController.hasClients) return;
+      final target = _scrollController.position.maxScrollExtent;
+      if (animate) {
+        _scrollController.animateTo(target,
+            duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
+      } else {
+        _scrollController.jumpTo(target);
       }
     });
   }
@@ -81,9 +101,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             hintText: 'Chat name',
             hintStyle: TextStyle(color: AppTheme.textMuted),
             filled: true,
-            fillColor: AppTheme.darkBg,
+            fillColor: AppTheme.elevated,
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppTheme.border)),
-            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColors.greenLight)),
+            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.greenLight)),
           ),
         ),
         actions: [
@@ -96,7 +116,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               }
               Navigator.pop(ctx);
             },
-            child: Text('Save', style: TextStyle(color: AppColors.greenLight)),
+            child: const Text('Save', style: TextStyle(color: AppColors.greenLight)),
           ),
         ],
       ),
@@ -113,32 +133,28 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     _scrollToBottom();
   }
 
-  // Hold-to-talk voice input
-  bool _isRecording = false;
-  String _voiceText = '';
-
-  void _startVoice() async {
-    if (_isRecording) return;
-    setState(() { _isRecording = true; _voiceText = ''; });
-    await _voiceService.startListening(
-      onResult: (text, isFinal) {
-        setState(() => _voiceText = text);
-        if (isFinal && text.isNotEmpty) {
-          _inputController.text = text;
-          _stopVoice();
-        }
-      },
-    );
-  }
-
-  void _stopVoice() async {
-    if (!_isRecording) return;
-    final text = await _voiceService.stopListening();
-    setState(() => _isRecording = false);
-    if (text.isNotEmpty) {
-      _inputController.text = text;
-      // Auto-send after hold-to-talk
-      _sendMessage();
+  // Click-to-talk: tap once to start, tap again to stop
+  void _toggleVoice() async {
+    if (_isRecording) {
+      // Stop recording
+      final text = await _voiceService.stopListening();
+      setState(() => _isRecording = false);
+      if (text.isNotEmpty) {
+        _inputController.text = text;
+        // Don't auto-send — let user review and send manually
+      }
+    } else {
+      // Start recording
+      setState(() { _isRecording = true; _voiceText = ''; });
+      await _voiceService.startListening(
+        onResult: (text, isFinal) {
+          setState(() => _voiceText = text);
+          if (isFinal && text.isNotEmpty) {
+            _inputController.text = text;
+            setState(() => _isRecording = false);
+          }
+        },
+      );
     }
   }
 
@@ -148,6 +164,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final thinking = ref.watch(thinkingStatusProvider);
     final convos = ref.watch(conversationsProvider);
     final title = convos.where((c) => c.remoteId == widget.conversationId).map((c) => c.title).firstOrNull ?? "New Chat";
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isCompact = screenWidth < 360;
 
     return Scaffold(
       backgroundColor: AppTheme.bg,
@@ -159,7 +177,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             children: [
               Flexible(
                 child: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppTheme.textMain)),
+                    style: TextStyle(fontSize: isCompact ? 14 : 16, fontWeight: FontWeight.w600, color: AppTheme.textMain)),
               ),
               const SizedBox(width: 6),
               Icon(Icons.edit, size: 14, color: AppTheme.textMuted),
@@ -176,19 +194,22 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          Expanded(
-            child: messages.isEmpty && thinking == null
-                ? _buildEmptyState()
-                : ListView.builder(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    itemCount: messages.length + (thinking != null ? 1 : 0),
-                    itemBuilder: (context, index) {
-                      if (index == messages.length && thinking != null) {
-                        return _ThinkingIndicator(text: thinking);
-                      }
+      body: CutePatternBackground(
+        child: Column(
+          children: [
+            Expanded(
+              child: messages.isEmpty && thinking == null
+                  ? _buildEmptyState()
+                  : Stack(
+                      children: [
+                        ListView.builder(
+                          controller: _scrollController,
+                          padding: EdgeInsets.symmetric(horizontal: isCompact ? 10 : 16, vertical: 12),
+                        itemCount: messages.length + (thinking != null ? 1 : 0),
+                        itemBuilder: (context, index) {
+                          if (index == messages.length && thinking != null) {
+                            return _ThinkingIndicator(text: thinking);
+                          }
                       final msg = messages[index];
                       final isUser = msg.role == 'user';
                       final isLastAssistant = index == messages.length - 1 && !isUser;
@@ -197,10 +218,42 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         isUser: isUser,
                         isStreaming: isLastAssistant && _isStreaming,
                         isLast: isLastAssistant,
+                        screenWidth: screenWidth,
+                        onEdit: isUser ? () {
+                          _inputController.text = msg.content;
+                          _inputController.selection = TextSelection.fromPosition(
+                              TextPosition(offset: msg.content.length));
+                        } : null,
+                        onResend: isUser ? (text) {
+                          _inputController.text = text;
+                          _sendMessage();
+                        } : null,
                       );
-                    },
+                        },
+                      ),
+                      // Go-to-bottom FAB
+                      if (_showGoToBottom)
+                        Positioned(
+                          right: 16,
+                          bottom: 12,
+                          child: GestureDetector(
+                            onTap: () => _scrollToBottom(),
+                            child: Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                color: AppColors.greenPrimary,
+                                shape: BoxShape.circle,
+                                boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 6, offset: const Offset(0, 2))],
+                              ),
+                              child: const Icon(Icons.keyboard_arrow_down, color: Colors.white, size: 24),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
           ),
+          // Recording indicator
           if (_isRecording)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -209,11 +262,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 children: [
                   const SizedBox(width: 8, height: 8, child: CircularProgressIndicator(strokeWidth: 1.5, color: Colors.redAccent)),
                   const SizedBox(width: 10),
-                  Text(_voiceText.isEmpty ? 'Listening... hold to talk' : _voiceText,
-                      style: TextStyle(color: AppTheme.textMain, fontSize: 13)),
+                  Expanded(
+                    child: Text(_voiceText.isEmpty ? 'Listening… tap mic to stop' : _voiceText,
+                        style: TextStyle(color: AppTheme.textMain, fontSize: 13), maxLines: 2, overflow: TextOverflow.ellipsis),
+                  ),
                 ],
               ),
             ),
+          // Pending image preview
           if (_pendingImage != null)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -228,6 +284,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             ),
           _buildInputBar(),
         ],
+      ),
       ),
     );
   }
@@ -264,21 +321,24 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   Widget _buildInputBar() {
     final hasText = _inputController.text.trim().isNotEmpty;
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(color: AppTheme.bg, border: Border(top: BorderSide(color: AppTheme.border))),
       child: SafeArea(
         top: false,
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
           children: [
+            // Image picker
             GestureDetector(
               onTap: _pickImage,
               child: Container(
-                width: 44, height: 44,
-                decoration: BoxDecoration(color: AppTheme.surface, borderRadius: BorderRadius.circular(14), border: Border.all(color: AppTheme.border)),
-                child: Icon(Icons.add, color: AppTheme.textMuted),
+                width: 40, height: 40,
+                decoration: BoxDecoration(color: AppTheme.surface, borderRadius: BorderRadius.circular(12), border: Border.all(color: AppTheme.border)),
+                child: Icon(Icons.add, color: AppTheme.textMuted, size: 20),
               ),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 8),
+            // Text field
             Expanded(
               child: TextField(
                 controller: _inputController,
@@ -286,45 +346,49 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 onSubmitted: (_) => _sendMessage(),
                 textInputAction: TextInputAction.send,
                 minLines: 1,
-                maxLines: 4,
-                style: TextStyle(color: AppTheme.textMain, fontSize: 14),
+                maxLines: 5,
+                style: TextStyle(color: AppTheme.textMain, fontSize: 15),
                 decoration: InputDecoration(
                   hintText: "Ask anything…",
                   hintStyle: TextStyle(color: AppTheme.textMuted),
                   filled: true,
                   fillColor: AppTheme.surface,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(22), borderSide: BorderSide(color: AppTheme.border)),
-                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(22), borderSide: BorderSide(color: AppTheme.border)),
-                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(22), borderSide: const BorderSide(color: AppColors.greenLight, width: 1.6)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide(color: AppTheme.border)),
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide(color: AppTheme.border)),
+                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: const BorderSide(color: AppColors.greenLight, width: 1.5)),
                 ),
               ),
             ),
-            const SizedBox(width: 10),
-            // Mic or Send button
+            const SizedBox(width: 8),
+            // Mic button (always visible, toggles recording)
+            GestureDetector(
+              onTap: _isStreaming ? null : _toggleVoice,
+              child: Container(
+                width: 40, height: 40,
+                decoration: BoxDecoration(
+                  color: _isRecording ? Colors.redAccent : AppTheme.surface,
+                  borderRadius: BorderRadius.circular(12),
+                  border: _isRecording ? null : Border.all(color: AppTheme.border),
+                ),
+                child: Icon(_isRecording ? Icons.stop : Icons.mic, color: _isRecording ? Colors.white : AppTheme.textMuted, size: 20),
+              ),
+            ),
+            const SizedBox(width: 8),
+            // Send button
             GestureDetector(
               onTap: _isStreaming ? null : (hasText ? _sendMessage : null),
-              onLongPress: hasText ? null : _startVoice,
-              onLongPressEnd: hasText ? null : (_) => _stopVoice(),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
-                width: 44, height: 44,
+                width: 40, height: 40,
                 decoration: BoxDecoration(
-                  color: _isRecording
-                      ? Colors.redAccent
-                      : hasText
-                          ? AppColors.greenPrimary
-                          : AppTheme.surface,
-                  borderRadius: BorderRadius.circular(14),
+                  color: hasText ? AppColors.greenPrimary : AppTheme.surface,
+                  borderRadius: BorderRadius.circular(12),
                   border: hasText ? null : Border.all(color: AppTheme.border),
                 ),
                 child: _isStreaming
-                    ? const Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : _isRecording
-                        ? const Icon(Icons.mic, color: Colors.white, size: 20)
-                        : hasText
-                            ? const Icon(Icons.arrow_upward_rounded, color: Colors.white, size: 20)
-                            : Icon(Icons.mic, color: AppTheme.textMuted, size: 20),
+                    ? const Padding(padding: EdgeInsets.all(10), child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : Icon(Icons.arrow_upward_rounded, color: hasText ? Colors.white : AppTheme.textMuted, size: 20),
               ),
             ),
           ],
@@ -367,18 +431,24 @@ class _ThinkingIndicator extends StatelessWidget {
   }
 }
 
-// ─── Message widget: hybrid layout ────────────────────────────────────
+// ─── Message widget ──────────────────────────────────────────────────
 class _MessageWidget extends StatelessWidget {
   final dynamic message;
   final bool isUser;
   final bool isStreaming;
   final bool isLast;
+  final double screenWidth;
+  final VoidCallback? onEdit;
+  final void Function(String)? onResend;
 
   const _MessageWidget({
     required this.message,
     required this.isUser,
     this.isStreaming = false,
     this.isLast = false,
+    this.screenWidth = 400,
+    this.onEdit,
+    this.onResend,
   });
 
   @override
@@ -386,59 +456,125 @@ class _MessageWidget extends StatelessWidget {
     final content = message.content as String? ?? '';
     if (content.isEmpty && !isStreaming) return const SizedBox.shrink();
 
-    if (isUser) return _UserMessage(content: content);
-    return _AiMessage(content: content, isStreaming: isStreaming, isLast: isLast);
+    if (isUser) return _UserMessage(content: content, screenWidth: screenWidth, onEdit: onEdit, onResend: onResend);
+    return _AiMessage(content: content, isStreaming: isStreaming, isLast: isLast, screenWidth: screenWidth);
   }
 }
 
-// ─── User message: clean bubble, right-aligned ────────────────────────
+// ─── User message: right-aligned with long-press menu ────────────────
 class _UserMessage extends StatelessWidget {
   final String content;
-  const _UserMessage({required this.content});
+  final double screenWidth;
+  final VoidCallback? onEdit;
+  final void Function(String)? onResend;
+  const _UserMessage({required this.content, this.screenWidth = 400, this.onEdit, this.onResend});
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Spacer(flex: 2),
-          Flexible(
-            flex: 3,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: AppColors.greenPrimary,
-                borderRadius: BorderRadius.only(
-                  topLeft: const Radius.circular(16),
-                  topRight: const Radius.circular(16),
-                  bottomLeft: const Radius.circular(16),
-                  bottomRight: const Radius.circular(4),
+    final isCompact = screenWidth < 360;
+    return GestureDetector(
+      onLongPress: () => _showUserMenu(context),
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Spacer(flex: 2),
+            Flexible(
+              flex: 3,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: AppColors.greenPrimary,
+                  borderRadius: BorderRadius.only(
+                    topLeft: const Radius.circular(16),
+                    topRight: const Radius.circular(16),
+                    bottomLeft: const Radius.circular(16),
+                    bottomRight: const Radius.circular(4),
+                  ),
                 ),
+                child: Text(content,
+                    style: TextStyle(color: Colors.white, fontSize: isCompact ? 13 : 14, height: 1.4)),
               ),
-              child: Text(content, style: const TextStyle(color: Colors.white, fontSize: 14, height: 1.4)),
             ),
-          ),
-          const SizedBox(width: 10),
-          Container(
-            width: 28, height: 28,
-            decoration: BoxDecoration(color: AppTheme.surface, borderRadius: BorderRadius.circular(10), border: Border.all(color: AppTheme.border)),
-            child: Icon(Icons.person_outline, size: 16, color: AppTheme.textMuted),
-          ),
-        ],
+            const SizedBox(width: 8),
+            Container(
+              width: 28, height: 28,
+              decoration: BoxDecoration(color: AppTheme.surface, borderRadius: BorderRadius.circular(10), border: Border.all(color: AppTheme.border)),
+              child: Icon(Icons.person_outline, size: 16, color: AppTheme.textMuted),
+            ),
+          ],
+        ),
       ),
     );
   }
+
+  void _showUserMenu(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppTheme.surface,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: Icon(Icons.copy, color: AppTheme.textMain),
+              title: Text('Copy', style: TextStyle(color: AppTheme.textMain)),
+              onTap: () {
+                Navigator.pop(ctx);
+                Clipboard.setData(ClipboardData(text: content));
+                ScaffoldMessenger.of(context).showSnackBar(_snackBar('Copied!'));
+              },
+            ),
+            if (onEdit != null)
+              ListTile(
+                leading: Icon(Icons.edit, color: AppTheme.textMain),
+                title: Text('Edit & Resend', style: TextStyle(color: AppTheme.textMain)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  onEdit!();
+                },
+              ),
+            if (onResend != null)
+              ListTile(
+                leading: Icon(Icons.refresh, color: AppTheme.textMain),
+                title: Text('Resend', style: TextStyle(color: AppTheme.textMain)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  onResend!(content);
+                },
+              ),
+            ListTile(
+              leading: Icon(Icons.share, color: AppTheme.textMain),
+              title: Text('Share', style: TextStyle(color: AppTheme.textMain)),
+              onTap: () {
+                Navigator.pop(ctx);
+                SharePlus.instance.share(ShareParams(text: content));
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  SnackBar _snackBar(String text) => SnackBar(
+    content: Text(text),
+    backgroundColor: AppColors.greenPrimary,
+    behavior: SnackBarBehavior.floating,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+  );
 }
 
-// ─── AI message: flat, no bubble, ChatGPT-style ──────────────────────
+// ─── AI message: flat, ChatGPT-style ─────────────────────────────────
 class _AiMessage extends StatelessWidget {
   final String content;
   final bool isStreaming;
   final bool isLast;
+  final double screenWidth;
 
-  const _AiMessage({required this.content, this.isStreaming = false, this.isLast = false});
+  const _AiMessage({required this.content, this.isStreaming = false, this.isLast = false, this.screenWidth = 400});
 
   @override
   Widget build(BuildContext context) {
@@ -464,7 +600,7 @@ class _AiMessage extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _MarkdownContent(content: content),
+                _MarkdownContent(content: content, screenWidth: screenWidth),
                 if (isStreaming)
                   Padding(
                     padding: const EdgeInsets.only(top: 4),
@@ -486,7 +622,7 @@ class _AiMessage extends StatelessWidget {
   }
 }
 
-// ─── Message actions: like / dislike / copy / share ───────────────────
+// ─── Message actions: like / dislike / copy / share (below last AI msg)
 class _MessageActions extends StatelessWidget {
   final String content;
   const _MessageActions({required this.content});
@@ -503,12 +639,7 @@ class _MessageActions extends StatelessWidget {
           const SizedBox(width: 4),
           _actionIcon(Icons.content_copy_outlined, () {
             Clipboard.setData(ClipboardData(text: content));
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-              content: const Text('Copied!'),
-              backgroundColor: AppColors.greenPrimary,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ));
+            ScaffoldMessenger.of(context).showSnackBar(_snackBar('Copied!'));
           }),
           const SizedBox(width: 4),
           _actionIcon(Icons.share_outlined, () => SharePlus.instance.share(ShareParams(text: content))),
@@ -527,6 +658,13 @@ class _MessageActions extends StatelessWidget {
     );
   }
 
+  SnackBar _snackBar(String text) => SnackBar(
+    content: Text(text),
+    backgroundColor: AppColors.greenPrimary,
+    behavior: SnackBarBehavior.floating,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+  );
+
   void _submitFeedback(BuildContext context, String feedback) async {
     try {
       final user = Supabase.instance.client.auth.currentUser;
@@ -537,47 +675,43 @@ class _MessageActions extends StatelessWidget {
         'feedback': feedback,
       });
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(feedback == 'like' ? 'Thanks for the feedback!' : 'Thanks, we\'ll improve!'),
-          backgroundColor: AppColors.greenPrimary,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ScaffoldMessenger.of(context).showSnackBar(_snackBar(
+          feedback == 'like' ? 'Thanks for the feedback!' : 'Thanks, we\'ll improve!',
         ));
       }
     } catch (_) {}
   }
 }
 
-// ─── Markdown content with table scroll ───────────────────────────────
+// ─── Markdown content: horizontal scroll ONLY for tables and code blocks ─
 class _MarkdownContent extends StatelessWidget {
   final String content;
-  const _MarkdownContent({required this.content});
+  final double screenWidth;
+  const _MarkdownContent({required this.content, this.screenWidth = 400});
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(minWidth: MediaQuery.of(context).size.width - 80),
-        child: markdown.MarkdownBody(
-          data: content,
-          selectable: true,
-          styleSheet: markdown.MarkdownStyleSheet(
-            p: TextStyle(color: AppTheme.textMain, fontSize: 14, height: 1.6),
-            code: TextStyle(backgroundColor: AppTheme.darkBg, color: AppColors.greenMint, fontSize: 13),
-            codeblockDecoration: BoxDecoration(color: AppTheme.darkBg, borderRadius: BorderRadius.circular(10)),
-            blockquote: TextStyle(color: AppTheme.textMuted, fontStyle: FontStyle.italic),
-            blockquoteDecoration: BoxDecoration(border: Border(left: BorderSide(color: AppColors.greenLight, width: 3))),
-            h1: TextStyle(color: AppTheme.textMain, fontSize: 20, fontWeight: FontWeight.bold),
-            h2: TextStyle(color: AppTheme.textMain, fontSize: 18, fontWeight: FontWeight.bold),
-            h3: TextStyle(color: AppTheme.textMain, fontSize: 16, fontWeight: FontWeight.bold),
-            listBullet: TextStyle(color: AppColors.greenLight),
-            tableHead: TextStyle(color: AppTheme.textMain, fontWeight: FontWeight.w600, fontSize: 13),
-            tableBody: TextStyle(color: AppTheme.textMain, fontSize: 13),
-            tableBorder: TableBorder.all(color: AppTheme.border, width: 1),
-            tableCellsPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-          ),
-        ),
+    final isCompact = screenWidth < 360;
+    final fontSize = isCompact ? 13.0 : 14.0;
+    final codeFontSize = isCompact ? 12.0 : 13.0;
+
+    return markdown.MarkdownBody(
+      data: content,
+      selectable: true,
+      styleSheet: markdown.MarkdownStyleSheet(
+        p: TextStyle(color: AppTheme.textMain, fontSize: fontSize, height: 1.6),
+        code: TextStyle(backgroundColor: AppTheme.elevated, color: AppColors.greenMint, fontSize: codeFontSize),
+        codeblockDecoration: BoxDecoration(color: AppTheme.elevated, borderRadius: BorderRadius.circular(10)),
+        blockquote: TextStyle(color: AppTheme.textMuted, fontStyle: FontStyle.italic),
+        blockquoteDecoration: BoxDecoration(border: Border(left: BorderSide(color: AppColors.greenLight, width: 3))),
+        h1: TextStyle(color: AppTheme.textMain, fontSize: fontSize + 6, fontWeight: FontWeight.bold),
+        h2: TextStyle(color: AppTheme.textMain, fontSize: fontSize + 4, fontWeight: FontWeight.bold),
+        h3: TextStyle(color: AppTheme.textMain, fontSize: fontSize + 2, fontWeight: FontWeight.bold),
+        listBullet: TextStyle(color: AppColors.greenLight),
+        tableHead: TextStyle(color: AppTheme.textMain, fontWeight: FontWeight.w600, fontSize: codeFontSize),
+        tableBody: TextStyle(color: AppTheme.textMain, fontSize: codeFontSize),
+        tableBorder: TableBorder.all(color: AppTheme.border, width: 1),
+        tableCellsPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       ),
     );
   }

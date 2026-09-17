@@ -24,8 +24,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final _emailCtrl = TextEditingController();
   final _universityCtrl = TextEditingController();
   final _programmeCtrl = TextEditingController();
-  final _majorCtrl = TextEditingController();
-  final _minorCtrl = TextEditingController();
   int _year = 1;
   int _semester = 1;
   String _selectedModel = 'openai/gpt-oss-120b';
@@ -44,8 +42,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _emailCtrl.text = profile['email'] ?? Supabase.instance.client.auth.currentUser?.email ?? '';
       _universityCtrl.text = profile['university'] ?? '';
       _programmeCtrl.text = profile['programme'] ?? '';
-      _majorCtrl.text = profile['major'] ?? '';
-      _minorCtrl.text = profile['minor'] ?? '';
       _year = (profile['year'] as num?)?.toInt() ?? 1;
       _semester = (profile['semester'] as num?)?.toInt() ?? 1;
       _isDark = prefs.getBool('dark_mode') ?? false;
@@ -77,8 +73,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         'programme': _programmeCtrl.text.trim(),
         'year': _year,
         'semester': _semester,
-        'major': _majorCtrl.text.trim(),
-        'minor': _minorCtrl.text.trim(),
         'updated_at': DateTime.now().toIso8601String(),
       }).eq('id', user.id);
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text('Profile saved'), backgroundColor: AppColors.greenPrimary));
@@ -172,13 +166,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ]),
                   const SizedBox(height: 10),
                   Row(children: [
-                    Expanded(child: _profileField('Major', _majorCtrl, Icons.menu_book)),
-                    const SizedBox(width: 10),
-                    Expanded(child: _profileField('Minor', _minorCtrl, Icons.more_horiz)),
-                  ]),
-                  const SizedBox(height: 10),
-                  Row(children: [
-                    Expanded(child: _dropdown('Semester', _semester, [1, 2, 3, 4, 5, 6], (v) => setState(() => _semester = v!))),
+                    Expanded(child: _dropdown('Semester', _semester, [1, 2, 3, 4, 5, 6, 7, 8], (v) => setState(() => _semester = v!))),
                     const Expanded(child: SizedBox()),
                   ]),
                   const SizedBox(height: 14),

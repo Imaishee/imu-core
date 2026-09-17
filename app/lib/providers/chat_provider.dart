@@ -109,48 +109,6 @@ class MessagesNotifier extends Notifier<List<ChatMessage>> {
     return words.sublist(0, 6).join(' ') + '…';
   }
 
-  /// Client-side gate deciding whether a message should be routed to the
-  /// tool-calling `ai-actions` endpoint instead of the streaming chat.
-  ///
-  /// Deliberately generous: an over-match only costs one extra (fast) hop,
-  /// because a reply with no actions falls straight through to normal chat.
-  /// Under-matching is the real failure — it silently ignores "set my alarm".
-  static bool looksLikeScheduling(String s) {
-    final lower = s.toLowerCase();
-
-    // Scheduling nouns.
-    if (RegExp(
-            r'\b(alarms?|remind(er|ers)?|timetables?|time\s+table|schedules?|classes|class|lectures?|periods?|routines?)\b')
-        .hasMatch(lower)) {
-      return true;
-    }
-
-    // A weekday mention is almost always a timetable or alarm edit.
-    if (RegExp(
-            r'\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tue|tues|wed|thu|thur|thurs|fri|sat|sun)\b')
-        .hasMatch(lower)) {
-      return true;
-    }
-
-    // "add/set/delete ... at 7pm" style requests with no scheduling noun.
-    const verbs = [
-      'add',
-      'create',
-      'set',
-      'delete',
-      'remove',
-      'clear',
-      'cancel',
-      'update',
-      'import',
-    ];
-    final hasVerb = verbs.any(lower.contains);
-    final hasTime = RegExp(
-            r"\d|o'?clock|\bam\b|\bpm\b|morning|afternoon|evening")
-        .hasMatch(lower);
-    return hasVerb && hasTime;
-  }
-
   Future<void> sendMessage(String content) async {
     if (content.trim().isEmpty) return;
 
@@ -168,55 +126,6 @@ class MessagesNotifier extends Notifier<List<ChatMessage>> {
     final hasAssistant = state.any((m) => m.role == 'assistant');
     if (!hasAssistant) {
       convoNotifier.updateTitle(_conversationId, _autoTitle(content));
-    }
-
-    // Scheduling requests need real actions, which the streaming chat endpoint
-    // cannot perform. Route them through the tool-calling service first.
-    if (looksLikeScheduling(content)) {
-      ref.read(thinkingStatusProvider.notifier).state = '⚙️ Applying…';
-      try {
-        final outcome = await AiActionsService().applyPrompt(content);
-        ref.read(thinkingStatusProvider.notifier).state = null;
-        if (outcome.hasChanges) {
-          await ref.read(timetableProvider.notifier).refresh();
-          state = [
-            ...state,
-            ChatMessage(
-              conversationId: _conversationId,
-              role: 'assistant',
-              content: outcome.reply,
-            ),
-          ];
-          ref.read(localStorageProvider).saveMessages(_conversationId, state);
-          // Sync conversation and messages to Supabase for admin visibility.
-          final convo = ref
-              .read(conversationsProvider)
-              .where((c) => c.remoteId == _conversationId)
-              .firstOrNull;
-          if (convo != null) {
-            ChatSyncService.syncConversation(convo);
-            for (final m in state) {
-              ChatSyncService.syncMessage(convo.supabaseId, m);
-            }
-          }
-          return;
-        }
-      } catch (e) {
-        // Scheduling failed — show error to user instead of silently falling through
-        ref.read(thinkingStatusProvider.notifier).state = null;
-        state = [
-          ...state,
-          ChatMessage(
-            conversationId: _conversationId,
-            role: 'assistant',
-            content: 'Failed to apply change: $e. Please try again.',
-          ),
-        ];
-        ref.read(localStorageProvider).saveMessages(_conversationId, state);
-        return;
-      } finally {
-        ref.read(thinkingStatusProvider.notifier).state = null;
-      }
     }
 
     ref.read(thinkingStatusProvider.notifier).state = 'Thinking…';
@@ -290,6 +199,8 @@ class MessagesNotifier extends Notifier<List<ChatMessage>> {
       final prefs = await SharedPreferences.getInstance();
       final selectedModel = prefs.getString('selected_model') ?? 'openai/gpt-oss-120b';
 
+      // ALL messages go through streaming chat — no client-side routing heuristic.
+      // The AI in the chat endpoint has timetable/alarm context and handles scheduling.
       await for (final event in ref
           .read(chatServiceProvider)
           .streamChat(
@@ -320,6 +231,11 @@ class MessagesNotifier extends Notifier<List<ChatMessage>> {
       }
       // Final flush for any remaining buffered text
       await _flushBuffer();
+
+      // Background action check: after chat responds, silently check if the AI
+      // mentioned scheduling (the chat endpoint sends timetable context, so the
+      // AI may say "I'll add that class"). If actions exist, apply them.
+      _applyActionsInBackground(content);
     } catch (e) {
       // Replace any partial assistant content
       if (state.isNotEmpty && state.last.role == 'assistant') {
@@ -350,6 +266,30 @@ class MessagesNotifier extends Notifier<List<ChatMessage>> {
       for (final m in state) {
         ChatSyncService.syncMessage(convo.supabaseId, m);
       }
+    }
+  }
+
+  /// Silently check if the user's message was a scheduling request and apply
+  /// actions in the background. This runs after the chat response so the user
+  /// sees the AI reply first, then any timetable/alarm changes happen.
+  void _applyActionsInBackground(String userMessage) async {
+    try {
+      final outcome = await AiActionsService().applyPrompt(userMessage);
+      if (outcome.hasChanges) {
+        await ref.read(timetableProvider.notifier).refresh();
+        // Append action results as a system note
+        state = [
+          ...state,
+          ChatMessage(
+            conversationId: _conversationId,
+            role: 'assistant',
+            content: outcome.message,
+          ),
+        ];
+        ref.read(localStorageProvider).saveMessages(_conversationId, state);
+      }
+    } catch (_) {
+      // Silently ignore — the chat response is already shown
     }
   }
 }
