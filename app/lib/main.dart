@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
@@ -24,6 +23,8 @@ import 'screens/pomodoro_screen.dart';
 import 'screens/notifications_screen.dart';
 import 'screens/chat_history_screen.dart';
 import 'screens/reset_password_screen.dart';
+import 'screens/verification_screen.dart';
+import 'services/deep_link_service.dart';
 
 // Re-export so the Dart VM can find it from the manifest entry-point.
 @pragma('vm:entry-point')
@@ -172,6 +173,9 @@ class _ImuAppState extends State<ImuApp> {
     final dark = prefs.getBool('dark_mode') ?? false;
     AppTheme.setDark(dark);
 
+    // Start deep link service (password reset / email verify callbacks)
+    DeepLinkService.instance.init();
+
     // Unblock the first screen as soon as local prefs are read. Never gate
     // the UI on a network call — a slow/hanging Supabase request would leave
     // the user staring at a spinner (indistinguishable from a white screen).
@@ -233,15 +237,24 @@ class _ImuAppState extends State<ImuApp> {
 
     final session = _currentSession();
 
-    // Check if app was opened via deep link (password reset)
-    String? resetToken;
+    // Check if app was opened via deep link (password reset / email verify)
+    Widget? deepLinkHome;
     try {
-      final uri = WidgetsBinding.instance.platformDispatcher.defaultRouteName;
-      if (uri.contains('reset-password') || uri.contains('access_token')) {
-        // Extract access_token from URI fragment or query
-        final fragment = uri.contains('#') ? uri.split('#').last : '';
+      final uri = DeepLinkService.instance.initialUri ??
+          Uri.tryParse(WidgetsBinding.instance.platformDispatcher.defaultRouteName);
+      if (uri != null) {
+        final fragment = uri.hasFragment ? uri.fragment : uri.query;
         final params = Uri.parse('?$fragment').queryParameters;
-        resetToken = params['access_token'];
+        final token = params['access_token'];
+        final type = params['type'] ?? uri.host;
+        if (token != null && token.isNotEmpty) {
+          if (type == 'recovery' || type == 'reset-password' || uri.host == 'reset-password') {
+            deepLinkHome = ResetPasswordScreen(accessToken: token);
+          } else {
+            // Email verify — complete session then go home
+            deepLinkHome = VerificationScreen(email: params['email'] ?? '');
+          }
+        }
       }
     } catch (_) {}
 
@@ -254,8 +267,8 @@ class _ImuAppState extends State<ImuApp> {
       // `home` (not `initialRoute`) is required: Flutter's initial-route
       // generation walks the '/' prefix and throws a null-check error when
       // no '/' route exists, which white-screens the app on launch.
-      home: resetToken != null
-          ? ResetPasswordScreen(accessToken: resetToken)
+      home: deepLinkHome != null
+          ? deepLinkHome
           : session != null
               ? HomeScreen(
                   onToggleTheme: _toggleTheme,

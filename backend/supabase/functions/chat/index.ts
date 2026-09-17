@@ -31,9 +31,13 @@ function needsWebSearch(text: string): boolean {
   return keywords.some(kw => lower.includes(kw));
 }
 
-// Multi-source web search: try DuckDuckGo first, then SearXNG fallback
+// Multi-source web search: try Google, then DuckDuckGo, then SearXNG
 async function webSearch(query: string): Promise<string> {
-  // Try DuckDuckGo HTML scraping (free, no API key)
+  // Google HTML scrape (best results)
+  const googleResults = await searchGoogle(query);
+  if (googleResults) return googleResults;
+
+  // Try DuckDuckGo HTML scraping
   const ddgResults = await searchDuckDuckGo(query);
   if (ddgResults) return ddgResults;
 
@@ -42,6 +46,36 @@ async function webSearch(query: string): Promise<string> {
   if (searxResults) return searxResults;
 
   return "";
+}
+
+async function searchGoogle(query: string): Promise<string> {
+  try {
+    const url = `https://www.google.com/search?q=${encodeURIComponent(query)}&num=6`;
+    const resp = await fetch(url, {
+      headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36", "Accept-Language": "en" },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!resp.ok) return "";
+    const html = await resp.text();
+
+    // Google wraps results in <a href> tags with <h3> titles and <div> snippets
+    const results: string[] = [];
+    const aMatches = html.match(/<a[^>]*href="\/url\?q=([^"&]+)[^"]*"[^>]*>([\s\S]*?)<\/a>/g) || [];
+    for (let i = 0; i < Math.min(aMatches.length, 6); i++) {
+      const m = aMatches[i];
+      const urlMatch = m.match(/href="\/url\?q=([^"&]+)/);
+      const titleMatch = m.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+      const url = urlMatch ? decodeURIComponent(urlMatch[1]) : "";
+      if (titleMatch && url && url.startsWith("http")) {
+        // Grab snippet from the block following this result
+        const after = html.slice(html.indexOf(m));
+        const snipMatch = after.match(/<div[^>]*>([\s\S]*?)<\/div>/);
+        const snippet = snipMatch ? snipMatch[1].replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim().substring(0, 200) : "";
+        results.push(`${results.length + 1}. ${titleMatch}\n${url}\n${snippet}`);
+      }
+    }
+    return results.join("\n\n");
+  } catch { return ""; }
 }
 
 async function searchDuckDuckGo(query: string): Promise<string> {

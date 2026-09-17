@@ -11,6 +11,7 @@ import '../providers/chat_provider.dart';
 import '../services/voice_service.dart';
 import '../theme/app_theme.dart';
 import '../theme/app_widgets.dart';
+import '../widgets/artifact_card.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
   final String conversationId;
@@ -125,10 +126,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   Future<void> _sendMessage() async {
     final text = _inputController.text.trim();
-    if ((text.isEmpty && _pendingImage == null) || _isStreaming) return;
+    final image = _pendingImage;
+    if ((text.isEmpty && image == null) || _isStreaming) return;
     _inputController.clear();
     setState(() { _isStreaming = true; _pendingImage = null; });
-    await ref.read(messagesProvider(widget.conversationId).notifier).sendMessage(text);
+    await ref.read(messagesProvider(widget.conversationId).notifier)
+        .sendMessage(text, image: image?.path);
     setState(() => _isStreaming = false);
     _scrollToBottom();
   }
@@ -146,7 +149,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     } else {
       // Start recording
       setState(() { _isRecording = true; _voiceText = ''; });
-      var started = true;
       await _voiceService.startListening(
         onResult: (text, isFinal) {
           if (!mounted) return;
@@ -617,7 +619,7 @@ class _AiMessage extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _MarkdownContent(content: content, screenWidth: screenWidth),
+                _ArtifactAwareMarkdown(content: content, screenWidth: screenWidth),
                 if (isStreaming)
                   Padding(
                     padding: const EdgeInsets.only(top: 4),
@@ -697,6 +699,75 @@ class _MessageActions extends StatelessWidget {
         ));
       }
     } catch (_) {}
+  }
+}
+
+// ─── Artifact-aware markdown: detects fenced artifact blocks (html/pdf/md) ─
+class _ArtifactAwareMarkdown extends StatelessWidget {
+  final String content;
+  final double screenWidth;
+  const _ArtifactAwareMarkdown({required this.content, this.screenWidth = 400});
+
+  // Languages that should render as downloadable artifact cards instead of
+  // plain code blocks. Everything else renders as normal markdown.
+  static const _artifactLangs = {'html', 'pdf', 'markdown', 'md'};
+
+  @override
+  Widget build(BuildContext context) {
+    // Split content into segments: normal markdown text + artifact blocks.
+    final segments = <Widget>[];
+    final pattern = RegExp(r'```(\w+)\n([\s\S]*?)```', multiLine: true);
+    var last = 0;
+    var hasArtifact = false;
+
+    for (final m in pattern.allMatches(content)) {
+      final lang = m.group(1)!.trim().toLowerCase();
+      final code = m.group(2) ?? '';
+
+      if (_artifactLangs.contains(lang)) {
+        if (m.start > last) {
+          segments.add(_MarkdownContent(
+              content: content.substring(last, m.start), screenWidth: screenWidth));
+        }
+        hasArtifact = true;
+        final title = _titleBefore(content.substring(0, m.start), lang);
+        segments.add(ArtifactCard(
+          title: title,
+          language: lang == 'md' ? 'markdown' : lang,
+          content: code,
+          previewable: true,
+        ));
+        last = m.end;
+      }
+    }
+
+    if (!hasArtifact) {
+      return _MarkdownContent(content: content, screenWidth: screenWidth);
+    }
+
+    if (last < content.length) {
+      segments.add(_MarkdownContent(
+          content: content.substring(last), screenWidth: screenWidth));
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: segments,
+    );
+  }
+
+  String _titleBefore(String before, String lang) {
+    final titleMatch = RegExp(r'title:\s*([^\n]+)').firstMatch(before);
+    if (titleMatch != null) return titleMatch.group(1)!.trim();
+    final heading = RegExp(r'^#+\s*(.+)$', multiLine: true).firstMatch(before);
+    if (heading != null) return heading.group(1)!.trim();
+    return switch (lang) {
+      'html' => 'HTML Page',
+      'pdf' => 'PDF Document',
+      'markdown' || 'md' => 'Markdown Notes',
+      _ => 'Generated File',
+    };
   }
 }
 

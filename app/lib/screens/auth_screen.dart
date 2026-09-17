@@ -20,12 +20,6 @@ class _AuthScreenState extends State<AuthScreen> {
   final _emailCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
   final _nameCtrl = TextEditingController();
-  final _universityCtrl = TextEditingController();
-  final _programmeCtrl = TextEditingController();
-  final _majorCtrl = TextEditingController();
-  final _minorCtrl = TextEditingController();
-  int _year = 1;
-  int _semester = 1;
 
   Future<void> _submit() async {
     if (_emailCtrl.text.trim().isEmpty || _passCtrl.text.isEmpty) {
@@ -52,14 +46,9 @@ class _AuthScreenState extends State<AuthScreen> {
         final resp = await client.auth.signUp(
           email: _emailCtrl.text.trim(),
           password: _passCtrl.text,
+          emailRedirectTo: 'com.imu://verify',
           data: {
             'full_name': _nameCtrl.text.trim(),
-            'university': _universityCtrl.text.trim(),
-            'programme': _programmeCtrl.text.trim(),
-            'year': _year.toString(),
-            'semester': _semester.toString(),
-            'major': _majorCtrl.text.trim(),
-            'minor': _minorCtrl.text.trim(),
           },
         );
         if (resp.user != null && mounted) {
@@ -122,9 +111,12 @@ class _AuthScreenState extends State<AuthScreen> {
                 ),
                 const SizedBox(height: 32),
 
-                if (!_isLogin)
+                if (!_isLogin) ...[
+                  const SizedBox(height: 14),
                   _field(_nameCtrl, 'Full Name', Icons.person_outline),
+                ],
 
+                const SizedBox(height: 14),
                 _field(_emailCtrl, 'Email', Icons.email_outlined, keyboardType: TextInputType.emailAddress),
                 const SizedBox(height: 14),
                 _field(_passCtrl, 'Password', Icons.lock_outline, obscure: _obscure),
@@ -137,25 +129,6 @@ class _AuthScreenState extends State<AuthScreen> {
                       child: Text('Forgot Password?', style: TextStyle(color: AppColors.greenLight, fontSize: 13)),
                     ),
                   ),
-
-                if (!_isLogin) ...[
-                  const SizedBox(height: 14),
-                  _field(_universityCtrl, 'University', Icons.school_outlined),
-                  const SizedBox(height: 14),
-                  _field(_programmeCtrl, 'Programme / Department', Icons.class_outlined),
-                  const SizedBox(height: 14),
-                  Row(children: [
-                    Expanded(child: _dropdown('Year', _year, [1, 2, 3, 4], (v) => setState(() => _year = v!))),
-                    const SizedBox(width: 12),
-                    Expanded(child: _dropdown('Semester', _semester, [1, 2, 3, 4, 5, 6], (v) => setState(() => _semester = v!))),
-                  ]),
-                  const SizedBox(height: 14),
-                  Row(children: [
-                    Expanded(child: _field(_majorCtrl, 'Major', Icons.menu_book_outlined)),
-                    const SizedBox(width: 12),
-                    Expanded(child: _field(_minorCtrl, 'Minor (optional)', Icons.more_horiz)),
-                  ]),
-                ],
 
                 if (_error != null)
                   Container(
@@ -224,24 +197,6 @@ class _AuthScreenState extends State<AuthScreen> {
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: AppTheme.border)),
         enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: AppTheme.border)),
         focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: AppColors.greenLight, width: 1.4)),
-      ),
-    );
-  }
-
-  Widget _dropdown(String label, int value, List<int> values, Function(int?) onChanged) {
-    return Container(
-      decoration: BoxDecoration(color: AppTheme.surface, borderRadius: BorderRadius.circular(14), border: Border.all(color: AppTheme.border)),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<int>(
-          value: value,
-          isExpanded: true,
-          dropdownColor: AppTheme.surface,
-          style: TextStyle(color: AppTheme.textMain, fontSize: 13),
-          icon: Icon(Icons.keyboard_arrow_down, color: AppTheme.textMuted),
-          items: values.map((v) => DropdownMenuItem(value: v, child: Text('$label $v'))).toList(),
-          onChanged: onChanged,
-        ),
       ),
     );
   }

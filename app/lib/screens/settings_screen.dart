@@ -24,8 +24,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final _emailCtrl = TextEditingController();
   final _universityCtrl = TextEditingController();
   final _programmeCtrl = TextEditingController();
-  int _year = 1;
-  int _semester = 1;
   String _selectedModel = 'openai/gpt-oss-120b';
 
   @override
@@ -42,8 +40,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _emailCtrl.text = profile['email'] ?? Supabase.instance.client.auth.currentUser?.email ?? '';
       _universityCtrl.text = profile['university'] ?? '';
       _programmeCtrl.text = profile['programme'] ?? '';
-      _year = (profile['year'] as num?)?.toInt() ?? 1;
-      _semester = (profile['semester'] as num?)?.toInt() ?? 1;
       _isDark = prefs.getBool('dark_mode') ?? false;
       _notifEnabled = prefs.getBool('notif_enabled') ?? true;
       _beforeMin = prefs.getInt('notif_before_min') ?? 10;
@@ -71,8 +67,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         'name': _nameCtrl.text.trim(),
         'university': _universityCtrl.text.trim(),
         'programme': _programmeCtrl.text.trim(),
-        'year': _year,
-        'semester': _semester,
         'updated_at': DateTime.now().toIso8601String(),
       }).eq('id', user.id);
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text('Profile saved'), backgroundColor: AppColors.greenPrimary));
@@ -157,17 +151,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   const SizedBox(height: 10),
                   _profileField('Email', _emailCtrl, Icons.email, readOnly: true),
                   const SizedBox(height: 10),
-                  _profileField('University', _universityCtrl, Icons.school),
-                  const SizedBox(height: 10),
                   Row(children: [
-                    Expanded(child: _profileField('Programme', _programmeCtrl, Icons.class_)),
+                    Expanded(child: _profileField('University', _universityCtrl, Icons.school)),
                     const SizedBox(width: 10),
-                    Expanded(child: _dropdown('Year', _year, [1, 2, 3, 4], (v) => setState(() => _year = v!))),
-                  ]),
-                  const SizedBox(height: 10),
-                  Row(children: [
-                    Expanded(child: _dropdown('Semester', _semester, [1, 2, 3, 4, 5, 6, 7, 8], (v) => setState(() => _semester = v!))),
-                    const Expanded(child: SizedBox()),
+                    Expanded(child: _profileField('Programme', _programmeCtrl, Icons.class_)),
                   ]),
                   const SizedBox(height: 14),
                   SizedBox(
@@ -432,28 +419,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppTheme.border)),
         focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColors.greenLight, width: 1.4)),
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-      ),
-    );
-  }
-
-  Widget _dropdown(String label, int value, List<int> options, Function(int?) onChanged) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-      decoration: BoxDecoration(
-        color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppTheme.border),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<int>(
-          value: value,
-          isExpanded: true,
-          dropdownColor: AppTheme.surface,
-          style: TextStyle(color: AppTheme.textMain, fontSize: 13),
-          icon: Icon(Icons.keyboard_arrow_down, color: AppTheme.textMuted, size: 18),
-          items: options.map((o) => DropdownMenuItem(value: o, child: Text('$label $o'))).toList(),
-          onChanged: onChanged,
-        ),
       ),
     );
   }

@@ -12,6 +12,7 @@ import 'alarms_screen.dart';
 import 'timetable_screen.dart';
 import 'notifications_screen.dart';
 import 'chat_history_screen.dart';
+import 'pomodoro_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   final VoidCallback? onToggleTheme;
@@ -121,39 +122,104 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     const SizedBox(height: 12),
                   ],
 
-                  // Greeting card
-                  GlassCard(
+                  // Greeting card (hero)
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [AppColors.greenDark, AppColors.greenPrimary],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [BoxShadow(color: AppColors.greenPrimary.withAlpha(50), blurRadius: 14, offset: const Offset(0, 6))],
+                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Hey $userName ✨',
-                            style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: AppTheme.textMain)),
-                        const SizedBox(height: 4),
-                        Text('What would you like to learn today?',
-                            style: TextStyle(fontSize: 14, color: AppTheme.textMuted)),
-                        const SizedBox(height: 14),
-                        Wrap(
-                          spacing: 10,
-                          runSpacing: 10,
+                        Row(
                           children: [
-                            _quickAction(Icons.chat_bubble_outline, 'New Chat', AppColors.greenPrimary, () {
-                              final convo = ref.read(conversationsProvider.notifier).create();
-                              ref.read(activeConversationProvider.notifier).set(convo.remoteId);
-                              Navigator.push(context, SlideUpRoute(page: ChatScreen(conversationId: convo.remoteId)));
-                            }),
-                            _quickAction(Icons.school_outlined, 'Timetable', const Color(0xFF2D6A4F), () {
-                              Navigator.push(context, SlideUpRoute(page: const TimetableScreen()));
-                            }),
-                            _quickAction(Icons.alarm_add_outlined, 'Alarms', const Color(0xFF52B788), () {
-                              Navigator.push(context, SlideUpRoute(page: const AlarmsScreen()));
-                            }),
-                            _quickAction(Icons.camera_alt_outlined, 'Scan Schedule', const Color(0xFF40916C), () {
-                              Navigator.push(context, SlideUpRoute(page: const TimetableScreen()));
-                            }),
+                            const Spacer(),
+                            // Decorative floating dots
+                            ...List.generate(3, (i) => Padding(
+                              padding: const EdgeInsets.only(left: 4),
+                              child: Container(
+                                width: 6 + i * 2,
+                                height: 6 + i * 2,
+                                decoration: const BoxDecoration(color: Color(0x55FFFFFF), shape: BoxShape.circle),
+                              ),
+                            )),
                           ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text('Hey $userName 👋',
+                            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: Colors.white)),
+                        const SizedBox(height: 4),
+                        const Text('Your AI study buddy is ready.',
+                            style: TextStyle(fontSize: 14, color: Color(0xCCFFFFFF))),
+                        const SizedBox(height: 16),
+                        // Chat CTA
+                        GestureDetector(
+                          onTap: () {
+                            final convo = ref.read(conversationsProvider.notifier).create();
+                            ref.read(activeConversationProvider.notifier).set(convo.remoteId);
+                            Navigator.push(context, SlideUpRoute(page: ChatScreen(conversationId: convo.remoteId)));
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(30),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.auto_awesome, color: AppColors.greenPrimary, size: 18),
+                                SizedBox(width: 8),
+                                Text("Ask I'MU anything", style: TextStyle(color: AppColors.greenDark, fontWeight: FontWeight.w700)),
+                              ],
+                            ),
+                          ),
                         ),
                       ],
                     ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Quick actions grid
+                  Row(
+                    children: [
+                      Expanded(child: _quickTile(Icons.school_outlined, 'Timetable', AppColors.greenPrimary, () {
+                        Navigator.push(context, SlideUpRoute(page: const TimetableScreen()));
+                      })),
+                      const SizedBox(width: 10),
+                      Expanded(child: _quickTile(Icons.alarm_add_outlined, 'Alarms', const Color(0xFF52B788), () {
+                        Navigator.push(context, SlideUpRoute(page: const AlarmsScreen()));
+                      })),
+                      const SizedBox(width: 10),
+                      Expanded(child: _quickTile(Icons.timer_outlined, 'Focus', const Color(0xFF40916C), () {
+                        Navigator.push(context, SlideUpRoute(page: const PomodoroScreen()));
+                      })),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(child: _quickTile(Icons.camera_alt_outlined, 'Scan Schedule', const Color(0xFF2D6A4F), () {
+                        Navigator.push(context, SlideUpRoute(page: const TimetableScreen()));
+                      })),
+                      const SizedBox(width: 10),
+                      Expanded(child: _quickTile(Icons.history, 'Chat History', const Color(0xFF95D5B2), () {
+                        Navigator.push(context, SlideUpRoute(page: const ChatHistoryScreen()));
+                      })),
+                      const SizedBox(width: 10),
+                      Expanded(child: _quickTile(Icons.picture_as_pdf_outlined, 'Make PDF', const Color(0xFF52B788), () {
+                        final convo = ref.read(conversationsProvider.notifier).create();
+                        ref.read(activeConversationProvider.notifier).set(convo.remoteId);
+                        Navigator.push(context, SlideUpRoute(page: ChatScreen(conversationId: convo.remoteId, initialPrompt: 'Create a PDF document for me')));
+                      })),
+                    ],
                   ),
 
                   const SizedBox(height: 16),
@@ -246,13 +312,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return IconButton(onPressed: onTap, icon: Icon(icon, color: color, size: 22));
   }
 
-  Widget _quickAction(IconData icon, String label, Color color, VoidCallback onTap) {
+  Widget _quickTile(IconData icon, String label, Color color, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(color: color.withAlpha(25), borderRadius: BorderRadius.circular(12), border: Border.all(color: color.withAlpha(60))),
-        child: Row(children: [Icon(icon, size: 16, color: color), const SizedBox(width: 6), Text(label, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w600))]),
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        decoration: BoxDecoration(
+          color: AppTheme.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: color.withAlpha(70)),
+          boxShadow: [BoxShadow(color: Colors.black.withAlpha(8), blurRadius: 8, offset: const Offset(0, 3))],
+        ),
+        child: Column(
+          children: [
+            Container(
+              width: 42, height: 42,
+              decoration: BoxDecoration(color: color.withAlpha(22), shape: BoxShape.circle),
+              child: Icon(icon, size: 20, color: color),
+            ),
+            const SizedBox(height: 8),
+            Text(label, textAlign: TextAlign.center, style: TextStyle(color: AppTheme.textMain, fontSize: 12, fontWeight: FontWeight.w600)),
+          ],
+        ),
       ),
     );
   }

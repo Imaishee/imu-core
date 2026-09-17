@@ -31,13 +31,43 @@ function needsWebSearch(text: string): boolean {
   return keywords.some(kw => lower.includes(kw));
 }
 
-// Multi-source web search: try DuckDuckGo first, then SearXNG fallback
+// Multi-source web search: try Google, then DuckDuckGo, then SearXNG
 async function webSearch(query: string): Promise<string> {
+  const googleResults = await searchGoogle(query);
+  if (googleResults) return googleResults;
   const ddgResults = await searchDuckDuckGo(query);
   if (ddgResults) return ddgResults;
   const searxResults = await searchSearXNG(query);
   if (searxResults) return searxResults;
   return "";
+}
+
+async function searchGoogle(query: string): Promise<string> {
+  try {
+    const url = `https://www.google.com/search?q=${encodeURIComponent(query)}&num=6`;
+    const resp = await fetch(url, {
+      headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36", "Accept-Language": "en" },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!resp.ok) return "";
+    const html = await resp.text();
+
+    const results: string[] = [];
+    const aMatches = html.match(/<a[^>]*href="\/url\?q=([^"&]+)[^"]*"[^>]*>([\s\S]*?)<\/a>/g) || [];
+    for (let i = 0; i < Math.min(aMatches.length, 6); i++) {
+      const m = aMatches[i];
+      const urlMatch = m.match(/href="\/url\?q=([^"&]+)/);
+      const titleMatch = m.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+      const url = urlMatch ? decodeURIComponent(urlMatch[1]) : "";
+      if (titleMatch && url && url.startsWith("http")) {
+        const after = html.slice(html.indexOf(m));
+        const snipMatch = after.match(/<div[^>]*>([\s\S]*?)<\/div>/);
+        const snippet = snipMatch ? snipMatch[1].replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim().substring(0, 200) : "";
+        results.push(`${results.length + 1}. ${titleMatch}\n${url}\n${snippet}`);
+      }
+    }
+    return results.join("\n\n");
+  } catch { return ""; }
 }
 
 async function searchDuckDuckGo(query: string): Promise<string> {

@@ -7,6 +7,7 @@ import '../services/chat_service.dart';
 import '../services/chat_sync_service.dart';
 import '../services/local_storage.dart';
 import '../services/timetable_service.dart';
+import '../services/vision_service.dart';
 import 'app_provider.dart';
 
 final chatServiceProvider = Provider((ref) => ChatService());
@@ -109,8 +110,54 @@ class MessagesNotifier extends Notifier<List<ChatMessage>> {
     return words.sublist(0, 6).join(' ') + '…';
   }
 
-  Future<void> sendMessage(String content) async {
-    if (content.trim().isEmpty) return;
+  Future<void> sendMessage(String content, {String? image}) async {
+    if (content.trim().isEmpty && (image == null || image.isEmpty)) return;
+
+    // If an image is attached, try to extract timetable classes from it first.
+    if (image != null && image.isNotEmpty) {
+      try {
+        final vision = VisionService();
+        final classes = await vision.parseTimetableImage(image,
+            prompt: 'Extract the full timetable from this image.');
+        if (classes.isNotEmpty) {
+          final svc = TimetableService();
+          final existing = await svc.loadLocal();
+          var added = 0;
+          for (final c in classes) {
+            if (!AiActionsService.isDuplicate(existing, c)) {
+              existing.add(c);
+              added++;
+            }
+          }
+          await svc.saveAll(existing);
+          if (added > 0) {
+            state = [
+              ...state,
+              ChatMessage(
+                conversationId: _conversationId,
+                role: 'user',
+                content: content.isEmpty
+                    ? '📷 Imported $added class(es) from image'
+                    : content,
+              ),
+            ];
+            state = [
+              ...state,
+              ChatMessage(
+                conversationId: _conversationId,
+                role: 'assistant',
+                content: '📷 Imported $added class(es) from your timetable image${
+                    content.isEmpty ? '' : ' ($content)'
+                  }. You can edit them in the Timetable tab.',
+              ),
+            ];
+            await ref.read(localStorageProvider).saveMessages(_conversationId, state);
+            await ref.read(timetableProvider.notifier).refresh();
+            // Still let the AI respond with a friendly confirmation.
+          }
+        }
+      } catch (_) {}
+    }
 
     final convoNotifier = ref.read(conversationsProvider.notifier);
 

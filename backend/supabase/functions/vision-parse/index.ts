@@ -70,7 +70,7 @@ serve(async (req) => {
         Authorization: `Bearer ${groqApiKey}`,
       },
       body: JSON.stringify({
-        model: "llama-3.2-90b-vision-preview",
+        model: "qwen/qwen3.8-27b",
         messages: [
           { role: "system", content: SYSTEM },
           { role: "user", content: userContent },
