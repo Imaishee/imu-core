@@ -482,22 +482,20 @@ class _UserMessage extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.end,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Flexible(
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                constraints: BoxConstraints(maxWidth: screenWidth * 0.78),
-                decoration: BoxDecoration(
-                  color: AppColors.greenPrimary,
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(16),
-                    topRight: Radius.circular(16),
-                    bottomLeft: Radius.circular(16),
-                    bottomRight: Radius.circular(4),
-                  ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              constraints: BoxConstraints(maxWidth: screenWidth * 0.78),
+              decoration: BoxDecoration(
+                color: AppColors.greenPrimary,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(16),
+                  topRight: Radius.circular(16),
+                  bottomLeft: Radius.circular(16),
+                  bottomRight: Radius.circular(4),
                 ),
-                child: Text(content,
-                    style: TextStyle(color: Colors.white, fontSize: isCompact ? 13 : 14, height: 1.4)),
               ),
+              child: Text(content,
+                  style: TextStyle(color: Colors.white, fontSize: isCompact ? 13 : 14, height: 1.4)),
             ),
             const SizedBox(width: 8),
             Container(
