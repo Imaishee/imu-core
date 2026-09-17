@@ -83,11 +83,27 @@ async function sendEmail(
     auth: { user: smtp.user, pass: smtp.pass },
   });
 
+  const subject = purpose === "recovery" ? "Your I'MU password reset code" : "Your I'MU verification code";
+  const text =
+    `${purpose === "recovery" ? "Reset your I'MU password" : "Verify your I'MU email"}\n\n` +
+    `Your one-time code is: ${code}\n` +
+    `It expires in ${purpose === "recovery" ? "15" : "10"} minutes.\n\n` +
+    `Open the I'MU app and enter this code.\n` +
+    `If you didn't request this, you can ignore this email.\n\n` +
+    `I'MU — AI Study Companion`;
+
   await transporter.sendMail({
     from: smtp.from,
     to,
-    subject: purpose === "recovery" ? "Reset your I'MU password" : "Verify your I'MU email",
+    subject,
+    text,
     html: emailTemplate({ code, purpose }),
+    headers: {
+      "X-Priority": "1",
+      "X-MSMail-Priority": "High",
+      Importance: "high",
+      "List-Unsubscribe": "<mailto:${smtp.user}?subject=unsubscribe>",
+    },
   });
 }
 

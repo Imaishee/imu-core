@@ -153,6 +153,20 @@ class _OtpScreenState extends State<OtpScreen> {
           style: TextStyle(color: AppTheme.textMuted, fontSize: 14, height: 1.5),
           textAlign: TextAlign.center,
         ),
+        const SizedBox(height: 10),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: AppColors.greenPrimary.withOpacity(0.06),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: AppColors.greenPrimary.withOpacity(0.15)),
+          ),
+          child: Text(
+            'Please check your spam/junk folder as well.',
+            style: TextStyle(color: AppColors.greenMedium, fontSize: 12),
+            textAlign: TextAlign.center,
+          ),
+        ),
         const SizedBox(height: 24),
 
         // OTP input
