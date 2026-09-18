@@ -4,11 +4,16 @@ import { useEffect, useState } from 'react';
 
 interface User {
   id: string;
+  email: string;
+  name: string;
+  avatar_url: string | null;
+  phone: string | null;
+  email_confirmed: boolean;
+  last_sign_in: string | null;
+  created_at: string;
   conversationCount: number;
   lastActive: string;
-  firstSeen: string;
   models: string[];
-  conversationIds: string[];
 }
 
 export default function UsersPage() {
@@ -19,11 +24,10 @@ export default function UsersPage() {
   const [loadingConvos, setLoadingConvos] = useState(false);
   const [search, setSearch] = useState('');
 
-  useEffect(() => {
-    fetchUsers();
-  }, []);
+  useEffect(() => { fetchUsers(); }, []);
 
   async function fetchUsers() {
+    setLoading(true);
     const res = await fetch('/api/users');
     const data = await res.json();
     setUsers(data.users || []);
@@ -40,9 +44,12 @@ export default function UsersPage() {
   }
 
   const filtered = users.filter(u =>
+    u.name.toLowerCase().includes(search.toLowerCase()) ||
+    u.email.toLowerCase().includes(search.toLowerCase()) ||
     u.id.toLowerCase().includes(search.toLowerCase())
   );
 
+  // ─── User Detail View ──────────────────────────────────────────────────────
   if (selected) {
     return (
       <div className="space-y-6">
@@ -53,32 +60,50 @@ export default function UsersPage() {
           >
             ← Back
           </button>
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-sm font-bold text-white">
-            {selected.id[0].toUpperCase()}
+          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-lg font-bold text-white overflow-hidden">
+            {selected.avatar_url ? (
+              <img src={selected.avatar_url} alt="" className="w-full h-full object-cover" />
+            ) : (
+              selected.name[0]?.toUpperCase() || '?'
+            )}
           </div>
           <div>
-            <h1 className="text-lg font-bold text-white font-mono">{selected.id.slice(0, 12)}...</h1>
-            <p className="text-xs text-zinc-500">First seen {new Date(selected.firstSeen).toLocaleDateString()}</p>
+            <h1 className="text-lg font-bold text-white">{selected.name}</h1>
+            <p className="text-xs text-zinc-500">{selected.email}</p>
           </div>
+          <span className={`ml-2 px-2 py-0.5 rounded-full text-[10px] font-medium ${
+            selected.email_confirmed ? 'bg-green-500/10 text-green-400' : 'bg-yellow-500/10 text-yellow-400'
+          }`}>
+            {selected.email_confirmed ? 'Verified' : 'Unverified'}
+          </span>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <MiniStat label="Conversations" value={selected.conversationCount} />
-          <MiniStat label="Models Used" value={selected.models.length} />
-          <MiniStat label="Last Active" value={new Date(selected.lastActive).toLocaleDateString()} />
-          <MiniStat label="Member Since" value={new Date(selected.firstSeen).toLocaleDateString()} />
+          <MiniStat label="Last Active" value={selected.lastActive ? new Date(selected.lastActive).toLocaleDateString() : 'Never'} />
+          <MiniStat label="Joined" value={new Date(selected.created_at).toLocaleDateString()} />
+          <MiniStat label="Last Sign In" value={selected.last_sign_in ? new Date(selected.last_sign_in).toLocaleDateString() : 'Never'} />
         </div>
 
         <div className="bg-[#0a0a0b] border border-[#1a1a1e] rounded-xl p-5">
-          <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider mb-3">
-            Models Used
-          </h2>
-          <div className="flex flex-wrap gap-2">
-            {selected.models.map(m => (
-              <span key={m} className="px-2.5 py-1 rounded-full text-xs font-medium bg-violet-500/10 text-violet-400 border border-violet-500/20">
-                {m}
-              </span>
-            ))}
+          <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider mb-3">User Details</h2>
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <span className="text-zinc-500">User ID</span>
+              <p className="text-white font-mono text-xs mt-0.5 break-all">{selected.id}</p>
+            </div>
+            <div>
+              <span className="text-zinc-500">Phone</span>
+              <p className="text-white mt-0.5">{selected.phone || 'Not provided'}</p>
+            </div>
+            <div>
+              <span className="text-zinc-500">Models Used</span>
+              <div className="flex flex-wrap gap-1 mt-0.5">
+                {selected.models.length > 0 ? selected.models.map(m => (
+                  <span key={m} className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-violet-500/10 text-violet-400">{m}</span>
+                )) : <span className="text-zinc-600">None</span>}
+              </div>
+            </div>
           </div>
         </div>
 
@@ -88,12 +113,10 @@ export default function UsersPage() {
           </h2>
           {loadingConvos ? (
             <div className="space-y-2">
-              {[1,2,3].map(i => (
-                <div key={i} className="h-12 bg-[#141416] rounded-lg animate-pulse" />
-              ))}
+              {[1,2,3].map(i => <div key={i} className="h-12 bg-[#141416] rounded-lg animate-pulse" />)}
             </div>
           ) : conversations.length === 0 ? (
-            <p className="text-sm text-zinc-600 italic">No conversations</p>
+            <p className="text-sm text-zinc-600 italic">No conversations yet</p>
           ) : (
             <div className="space-y-1.5">
               {conversations.map((c: any) => (
@@ -102,7 +125,7 @@ export default function UsersPage() {
                     <span className="text-zinc-600">💬</span>
                     <div>
                       <p className="text-sm text-white">{c.title || 'Untitled'}</p>
-                      <p className="text-[11px] text-zinc-600">{c.model}</p>
+                      <p className="text-[11px] text-zinc-600">{c.model || 'No model'}</p>
                     </div>
                   </div>
                   <span className="text-[11px] text-zinc-600">{new Date(c.updated_at).toLocaleDateString()}</span>
@@ -115,20 +138,21 @@ export default function UsersPage() {
     );
   }
 
+  // ─── User List View ────────────────────────────────────────────────────────
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white tracking-tight">Users</h1>
-          <p className="text-sm text-zinc-500 mt-0.5">{users.length} unique users from conversations</p>
+          <p className="text-sm text-zinc-500 mt-0.5">{users.length} registered users</p>
         </div>
         <div className="flex items-center gap-3">
           <input
             type="text"
-            placeholder="Search by ID..."
+            placeholder="Search name, email, ID..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="bg-[#141416] border border-[#1a1a1e] rounded-lg px-3 py-1.5 text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-violet-500/50 w-48"
+            className="bg-[#141416] border border-[#1a1a1e] rounded-lg px-3 py-1.5 text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-violet-500/50 w-56"
           />
           <button
             onClick={fetchUsers}
@@ -141,9 +165,7 @@ export default function UsersPage() {
 
       {loading ? (
         <div className="space-y-2">
-          {[1,2,3,4,5].map(i => (
-            <div key={i} className="h-16 bg-[#0a0a0b] border border-[#1a1a1e] rounded-xl animate-pulse" />
-          ))}
+          {[1,2,3,4,5].map(i => <div key={i} className="h-16 bg-[#0a0a0b] border border-[#1a1a1e] rounded-xl animate-pulse" />)}
         </div>
       ) : (
         <div className="bg-[#0a0a0b] border border-[#1a1a1e] rounded-xl overflow-hidden">
@@ -152,8 +174,8 @@ export default function UsersPage() {
               <tr className="border-b border-[#1a1a1e]">
                 <th className="text-left px-4 py-3 text-[11px] text-zinc-500 font-medium uppercase tracking-wider">User</th>
                 <th className="text-left px-4 py-3 text-[11px] text-zinc-500 font-medium uppercase tracking-wider">Conversations</th>
-                <th className="text-left px-4 py-3 text-[11px] text-zinc-500 font-medium uppercase tracking-wider">Models</th>
-                <th className="text-left px-4 py-3 text-[11px] text-zinc-500 font-medium uppercase tracking-wider">Last Active</th>
+                <th className="text-left px-4 py-3 text-[11px] text-zinc-500 font-medium uppercase tracking-wider">Status</th>
+                <th className="text-left px-4 py-3 text-[11px] text-zinc-500 font-medium uppercase tracking-wider">Joined</th>
               </tr>
             </thead>
             <tbody>
@@ -165,12 +187,16 @@ export default function UsersPage() {
                 >
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-xs font-bold text-white">
-                        {user.id[0].toUpperCase()}
+                      <div className="w-9 h-9 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-sm font-bold text-white overflow-hidden">
+                        {user.avatar_url ? (
+                          <img src={user.avatar_url} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          user.name[0]?.toUpperCase() || '?'
+                        )}
                       </div>
                       <div>
-                        <span className="text-sm text-white font-mono">{user.id.slice(0, 12)}...</span>
-                        <p className="text-[11px] text-zinc-600">Since {new Date(user.firstSeen).toLocaleDateString()}</p>
+                        <p className="text-sm font-medium text-white">{user.name}</p>
+                        <p className="text-[11px] text-zinc-500">{user.email}</p>
                       </div>
                     </div>
                   </td>
@@ -180,26 +206,21 @@ export default function UsersPage() {
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex flex-wrap gap-1">
-                      {user.models.slice(0, 2).map(m => (
-                        <span key={m} className="text-[10px] px-1.5 py-0.5 rounded bg-[#1a1a1e] text-zinc-500">
-                          {m}
-                        </span>
-                      ))}
-                      {user.models.length > 2 && (
-                        <span className="text-[10px] text-zinc-600">+{user.models.length - 2}</span>
-                      )}
-                    </div>
+                    <span className={`px-2 py-1 rounded-full text-[10px] font-medium ${
+                      user.email_confirmed ? 'bg-green-500/10 text-green-400' : 'bg-yellow-500/10 text-yellow-400'
+                    }`}>
+                      {user.email_confirmed ? 'Verified' : 'Unverified'}
+                    </span>
                   </td>
                   <td className="px-4 py-3 text-sm text-zinc-500">
-                    {new Date(user.lastActive).toLocaleDateString()}
+                    {new Date(user.created_at).toLocaleDateString()}
                   </td>
                 </tr>
               ))}
               {filtered.length === 0 && (
                 <tr>
                   <td colSpan={4} className="px-4 py-12 text-center text-zinc-600 text-sm">
-                    {search ? 'No matching users' : 'No users yet'}
+                    {search ? 'No matching users' : 'No users registered yet'}
                   </td>
                 </tr>
               )}

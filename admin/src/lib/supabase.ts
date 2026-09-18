@@ -28,16 +28,22 @@ export async function getDashboardStats() {
     supabase.from('friends').select('id', { count: 'exact', head: true }),
   ]);
 
-  // Unique users from conversations
-  const { data: convData } = await supabase
-    .from('conversations')
-    .select('user_id')
-    .limit(10000);
-
-  const uniqueUsers = new Set((convData || []).map(c => c.user_id).filter(Boolean));
+  // Get actual user count from Supabase Auth
+  let totalUsers = 0;
+  try {
+    const { data: authUsers } = await supabase.auth.admin.listUsers({ perPage: 1000 });
+    totalUsers = authUsers?.users?.length || 0;
+  } catch {
+    // Fallback: count unique user_ids from conversations
+    const { data: convData } = await supabase
+      .from('conversations')
+      .select('user_id')
+      .limit(10000);
+    totalUsers = new Set((convData || []).map(c => c.user_id).filter(Boolean)).size;
+  }
 
   return {
-    totalUsers: uniqueUsers.size,
+    totalUsers,
     totalConversations: convResult.count || 0,
     totalMessages: (msgResult.count || 0) + (aiMsgResult.count || 0),
     totalNotifications: notifResult.count || 0,
@@ -45,12 +51,78 @@ export async function getDashboardStats() {
   };
 }
 
-// ─── Users (derived from conversations) ────────────────────────────────────────
+// ─── Users (from Supabase Auth Admin API + conversation stats) ────────────────
 
 export async function getUsers() {
   const supabase = getClient();
 
-  // Get all conversations with user_id
+  // 1. Get ALL registered users from Supabase Auth (using service role key)
+  const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers({
+    perPage: 1000,
+  });
+
+  if (authError) {
+    // Fallback: try fetching from conversations if auth admin fails
+    console.error('Auth admin listUsers failed:', authError);
+    return getUsersFromConversations(supabase);
+  }
+
+  // 2. Get conversation stats per user
+  const { data: convs } = await supabase
+    .from('conversations')
+    .select('user_id, id, title, model, created_at, updated_at')
+    .order('created_at', { ascending: false })
+    .limit(10000);
+
+  // Build conversation stats map
+  const convStats = new Map<string, {
+    conversationCount: number;
+    lastActive: string;
+    firstSeen: string;
+    models: Set<string>;
+  }>();
+
+  for (const conv of convs || []) {
+    const uid = conv.user_id;
+    if (!uid) continue;
+    if (!convStats.has(uid)) {
+      convStats.set(uid, {
+        conversationCount: 0,
+        lastActive: conv.updated_at || conv.created_at,
+        firstSeen: conv.created_at,
+        models: new Set(),
+      });
+    }
+    const s = convStats.get(uid)!;
+    s.conversationCount++;
+    if (conv.model) s.models.add(conv.model);
+    if (conv.updated_at > s.lastActive) s.lastActive = conv.updated_at;
+    if (conv.created_at < s.firstSeen) s.firstSeen = conv.created_at;
+  }
+
+  // 3. Merge auth users with conversation stats
+  const users = (authUsers?.users || []).map(u => {
+    const stats = convStats.get(u.id);
+    return {
+      id: u.id,
+      email: u.email || 'No email',
+      name: u.user_metadata?.full_name || u.user_metadata?.name || u.email?.split('@')[0] || 'Unknown',
+      avatar_url: u.user_metadata?.avatar_url || null,
+      phone: u.phone || null,
+      email_confirmed: u.email_confirmed_at ? true : false,
+      last_sign_in: u.last_sign_in_at,
+      created_at: u.created_at,
+      conversationCount: stats?.conversationCount || 0,
+      lastActive: stats?.lastActive || u.last_sign_in_at || u.created_at,
+      models: stats ? Array.from(stats.models) : [],
+    };
+  }).sort((a, b) => new Date(b.lastActive).getTime() - new Date(a.lastActive).getTime());
+
+  return { users, error: null };
+}
+
+// Fallback: derive users from conversations only (if auth admin fails)
+async function getUsersFromConversations(supabase: any) {
   const { data: convs, error: convError } = await supabase
     .from('conversations')
     .select('user_id, id, title, model, created_at, updated_at')
@@ -59,45 +131,30 @@ export async function getUsers() {
 
   if (convError) return { users: [], error: convError };
 
-  // Group by user_id to build user profiles
-  const userMap = new Map<string, {
-    id: string;
-    conversationCount: number;
-    lastActive: string;
-    firstSeen: string;
-    models: Set<string>;
-    conversationIds: string[];
-  }>();
-
+  const userMap = new Map<string, any>();
   for (const conv of convs || []) {
     const uid = conv.user_id;
     if (!uid) continue;
-
     if (!userMap.has(uid)) {
       userMap.set(uid, {
         id: uid,
+        email: 'Unknown',
+        name: uid.slice(0, 8),
         conversationCount: 0,
         lastActive: conv.updated_at || conv.created_at,
         firstSeen: conv.created_at,
         models: new Set(),
-        conversationIds: [],
       });
     }
-
-    const user = userMap.get(uid)!;
-    user.conversationCount++;
-    user.conversationIds.push(conv.id);
-    if (conv.model) user.models.add(conv.model);
-    if (conv.updated_at > user.lastActive) user.lastActive = conv.updated_at;
-    if (conv.created_at < user.firstSeen) user.firstSeen = conv.created_at;
+    const u = userMap.get(uid)!;
+    u.conversationCount++;
+    if (conv.model) u.models.add(conv.model);
+    if (conv.updated_at > u.lastActive) u.lastActive = conv.updated_at;
   }
 
   const users = Array.from(userMap.values())
-    .map(u => ({
-      ...u,
-      models: Array.from(u.models),
-    }))
-    .sort((a, b) => new Date(b.lastActive).getTime() - new Date(a.lastActive).getTime());
+    .map(u => ({ ...u, models: Array.from(u.models) }))
+    .sort((a: any, b: any) => new Date(b.lastActive).getTime() - new Date(a.lastActive).getTime());
 
   return { users, error: null };
 }

@@ -21,6 +21,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from companion_engine import get_engine
+from imu_heart_inference import get_inference, load_model as load_imu_heart
 
 # ─── Config ────────────────────────────────────────────────────────────────────
 
@@ -42,6 +43,20 @@ async def lifespan(app: FastAPI):
     logger.info(
         f"Layer 1 ready: {stats['pairs']} pairs, {stats['markov_states']} Markov states"
     )
+
+    # Load IMU_Heart neural model (optional, non-blocking)
+    try:
+        imu_loaded = load_imu_heart()
+        if imu_loaded:
+            inference = get_inference()
+            logger.info(
+                f"IMU_Heart model loaded: {inference.model.count_parameters():,} params"
+            )
+        else:
+            logger.warning("IMU_Heart model not available (missing model files)")
+    except Exception as e:
+        logger.warning(f"IMU_Heart model load failed: {e} — using Markov engine only")
+
     yield
     logger.info("Shutting down...")
 
@@ -213,22 +228,48 @@ async def root():
 async def health():
     engine = get_engine()
     stats = engine.stats()
-    return {"status": "ok", "pairs": stats["pairs"]}
+    inference = get_inference()
+    return {
+        "status": "ok",
+        "pairs": stats["pairs"],
+        "imu_heart_loaded": inference.loaded,
+        "imu_heart_params": inference.model.count_parameters()
+        if inference.loaded
+        else 0,
+    }
 
 
 @app.post("/chat", response_model=ChatResponse)
 async def chat(req: ChatRequest):
-    """Two-layer chat: Dataset seed → Groq polish."""
+    """Two-layer chat: Dataset seed + Neural seed → Groq polish."""
     if not req.message or len(req.message.strip()) < 1:
         raise HTTPException(status_code=400, detail="Message cannot be empty")
 
-    # Layer 1: Generate seed from dataset
+    # Layer 1a: Generate seed from dataset (Markov + keyword matching)
     engine = get_engine()
     seed_data = engine.generate_seed(
         user_message=req.message.strip(),
         companion_gender=req.companion_gender,
         user_name=req.user_name,
     )
+
+    # Layer 1b: Try IMU_Heart neural model for additional seed
+    inference = get_inference()
+    neural_seed = None
+    if inference.loaded:
+        try:
+            neural_seed = inference.generate(
+                req.message.strip(), max_len=30, temperature=0.8
+            )
+            if neural_seed and len(neural_seed) < 3:
+                neural_seed = None  # Too short, discard
+        except Exception as e:
+            logger.warning(f"IMU_Heart inference failed: {e}")
+
+    # Add neural seed to seed phrases if available
+    if neural_seed:
+        seed_data["seed_phrases"].insert(0, neural_seed)
+        seed_data["neural_seed"] = neural_seed
 
     # Layer 2: Polish via Groq
     polished = await groq_polish(seed_data)
