@@ -120,45 +120,66 @@ Deno.serve(async (req) => {
       { role: "user", content: message },
     ];
 
-    // Call AI model via Groq
-    const model = "openai/gpt-oss-120b";
-    const apiKey = Deno.env.get("GROQ_API_KEY") || Deno.env.get("OPENAI_API_KEY") || Deno.env.get("OPENROUTER_API_KEY");
+    // ─── Layer 1: Try Render IMU Heart Engine first ──────────────────────────
+    const ENGINE_URL = Deno.env.get("ENGINE_URL") || "https://imu-heart.onrender.com";
+    let aiMessage = "Hmm... ki bolbo 😶";
 
-    if (!apiKey) {
-      return new Response(
-        JSON.stringify({ error: "API key not configured" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    try {
+      const engineResp = await fetch(`${ENGINE_URL}/generate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message,
+          gender,
+          conversation_history: (conversationHistory || []).slice(-20).map((m: any) => ({
+            role: m.role === "user" ? "user" : "assistant",
+            content: m.content,
+          })),
+        }),
+        signal: AbortSignal.timeout(8000), // 8s timeout for cold starts
+      });
+
+      if (engineResp.ok) {
+        const engineData = await engineResp.json();
+        if (engineData.response) {
+          aiMessage = engineData.response;
+          console.log("Render engine responded successfully");
+        }
+      } else {
+        console.log("Render engine returned", engineResp.status, "- falling back to Groq");
+      }
+    } catch (e) {
+      console.log("Render engine unavailable, falling back to Groq:", e);
     }
 
-    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        messages,
-        max_tokens: 300, // Reasoning models need more tokens for reasoning + output
-        temperature: 0.9, // High creativity for personality
-        top_p: 0.95,
-      }),
-    });
+    // ─── Layer 2: Fallback to direct Groq if engine failed ───────────────────
+    if (aiMessage === "Hmm... ki bolbo 😶") {
+      const model = "openai/gpt-oss-120b";
+      const apiKey = Deno.env.get("GROQ_API_KEY") || Deno.env.get("OPENAI_API_KEY") || Deno.env.get("OPENROUTER_API_KEY");
 
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error("AI API error:", errText);
-      return new Response(
-        JSON.stringify({ error: "AI service unavailable" }),
-        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      if (apiKey) {
+        const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model,
+            messages,
+            max_tokens: 300,
+            temperature: 0.9,
+            top_p: 0.95,
+          }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const choice = data.choices?.[0];
+          aiMessage = choice?.message?.content || choice?.message?.reasoning || "Hmm... ki bolbo 😶";
+        }
+      }
     }
-
-    const data = await response.json();
-    // Reasoning models put content in 'reasoning' field sometimes; check both
-    const choice = data.choices?.[0];
-    const aiMessage = choice?.message?.content || choice?.message?.reasoning || "Hmm... ki bolbo 😶";
 
     // Return response
     return new Response(
