@@ -24,6 +24,7 @@ import 'screens/notifications_screen.dart';
 import 'screens/chat_history_screen.dart';
 import 'screens/reset_password_screen.dart';
 import 'screens/verification_screen.dart';
+import 'screens/friends_screen.dart';
 import 'services/deep_link_service.dart';
 
 // Re-export so the Dart VM can find it from the manifest entry-point.
@@ -270,13 +271,7 @@ class _ImuAppState extends State<ImuApp> {
       home: deepLinkHome != null
           ? deepLinkHome
           : session != null
-              ? HomeScreen(
-                  onToggleTheme: _toggleTheme,
-                  latestVersion: _latestVersion,
-                  updateUrl: _updateUrl,
-                  updateNotes: _updateNotes,
-                  forceUpdate: _forceUpdate,
-                )
+              ? const ChatScreen(conversationId: 'ai-companion')
               : const AuthScreen(),
       routes: {
         '/home': (_) => HomeScreen(
@@ -287,13 +282,14 @@ class _ImuAppState extends State<ImuApp> {
               forceUpdate: _forceUpdate,
             ),
         '/auth': (_) => const AuthScreen(),
-        '/chat': (_) => const ChatScreen(conversationId: ''),
+        '/chat': (_) => const ChatScreen(conversationId: 'ai-companion'),
         '/settings': (_) => SettingsScreen(onToggleTheme: _toggleTheme),
         '/alarms': (_) => const AlarmsScreen(),
         '/pomodoro': (_) => const PomodoroScreen(),
         '/timetable': (_) => const TimetableScreen(),
         '/notifications': (_) => const NotificationsScreen(),
         '/chat-history': (_) => const ChatHistoryScreen(),
+        '/friends': (_) => const FriendsScreen(),
         '/reset-password': (_) => const ResetPasswordScreen(),
       },
     );

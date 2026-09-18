@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/chat_message.dart';
 import '../models/conversation.dart';
 import '../services/ai_actions_service.dart';
+import '../services/ai_companion_service.dart';
 import '../services/chat_service.dart';
 import '../services/chat_sync_service.dart';
 import '../services/local_storage.dart';
@@ -252,38 +253,81 @@ class MessagesNotifier extends Notifier<List<ChatMessage>> {
       final prefs = await SharedPreferences.getInstance();
       final selectedModel = prefs.getString('selected_model') ?? 'openai/gpt-oss-120b';
 
-      // ALL messages go through streaming chat — no client-side routing heuristic.
-      // The AI in the chat endpoint has timetable/alarm context and handles scheduling.
-      await for (final event in ref
-          .read(chatServiceProvider)
-          .streamChat(
-            messages: apiMessages,
-            conversationId: _conversationId,
-            context: chatContext.isNotEmpty ? chatContext : null,
-            model: selectedModel,
-          )) {
-        final type = event['type'];
+      // Check if this is the AI companion conversation
+      final isAICompanion = _conversationId == 'ai-companion';
 
-        if (type == 'status') {
-          await _flushBuffer();
-          final step = event['step'] ?? 'working';
-          final detail = event['detail'] ?? '';
-          ref.read(thinkingStatusProvider.notifier).state =
-              '${step == 'searching' ? '🔍 Searching' : step == 'thinking' ? '🧠 Thinking' : step == 'scraping' ? '🌐 Reading page' : '⚙️ Working'}' +
-              (detail.isNotEmpty ? ' — $detail' : '');
-        } else if (type == 'chunk') {
-          final text = event['text'] as String;
-          if (text.isNotEmpty) {
-            _chunkBuffer.write(text);
-            // Flush if enough time has passed since last flush
-            if (DateTime.now().difference(_lastFlush).inMilliseconds >= 50) {
-              await _flushBuffer();
+      if (isAICompanion) {
+        // Use AI Companion service for personality-driven responses
+        final companionGender = await AICompanionService.getCompanionGender();
+        final history = apiMessages.length > 1 
+            ? apiMessages.sublist(0, apiMessages.length - 1) // All but current message
+            : [];
+
+        try {
+          final result = await AICompanionService.sendMessage(
+            message: content,
+            conversationHistory: history,
+            companionGender: companionGender,
+          );
+
+          final aiMessage = result['message'] ?? 'Hmm... ki bolbo 😶';
+          
+          // Add AI response
+          state = [
+            ...state,
+            ChatMessage(
+              conversationId: _conversationId,
+              role: 'assistant',
+              content: aiMessage,
+            ),
+          ];
+
+          // Update last active timestamp
+          await AICompanionService.updateLastActive();
+        } catch (e) {
+          print('[ChatProvider] AI Companion error: $e');
+          state = [
+            ...state,
+            ChatMessage(
+              conversationId: _conversationId,
+              role: 'assistant',
+              content: 'Sorry, ami ektu problem e achi... porar por ashbo 💚',
+            ),
+          ];
+        }
+      } else {
+        // Regular chat flow for non-companion conversations
+        await for (final event in ref
+            .read(chatServiceProvider)
+            .streamChat(
+              messages: apiMessages,
+              conversationId: _conversationId,
+              context: chatContext.isNotEmpty ? chatContext : null,
+              model: selectedModel,
+            )) {
+          final type = event['type'];
+
+          if (type == 'status') {
+            await _flushBuffer();
+            final step = event['step'] ?? 'working';
+            final detail = event['detail'] ?? '';
+            ref.read(thinkingStatusProvider.notifier).state =
+                '${step == 'searching' ? '🔍 Searching' : step == 'thinking' ? '🧠 Thinking' : step == 'scraping' ? '🌐 Reading page' : '⚙️ Working'}' +
+                (detail.isNotEmpty ? ' — $detail' : '');
+          } else if (type == 'chunk') {
+            final text = event['text'] as String;
+            if (text.isNotEmpty) {
+              _chunkBuffer.write(text);
+              // Flush if enough time has passed since last flush
+              if (DateTime.now().difference(_lastFlush).inMilliseconds >= 50) {
+                await _flushBuffer();
+              }
             }
           }
         }
+        // Final flush for any remaining buffered text
+        await _flushBuffer();
       }
-      // Final flush for any remaining buffered text
-      await _flushBuffer();
 
       // Background action check: after chat responds, silently check if the AI
       // mentioned scheduling (the chat endpoint sends timetable context, so the

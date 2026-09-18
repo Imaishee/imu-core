@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme/app_theme.dart';
 import 'forgot_password_screen.dart';
+import 'gender_selection_screen.dart';
 import 'otp_screen.dart';
 
 class AuthScreen extends StatefulWidget {
@@ -52,12 +53,9 @@ class _AuthScreenState extends State<AuthScreen> {
           },
         );
         if (resp.user != null && mounted) {
-          // Send a verification OTP and show the OTP entry screen.
-          Navigator.push(context, MaterialPageRoute(
-            builder: (_) => OtpScreen(
-              email: _emailCtrl.text.trim(),
-              flow: OtpFlow.signup,
-            ),
+          // After signup, go to gender selection
+          Navigator.pushReplacement(context, MaterialPageRoute(
+            builder: (_) => const GenderSelectionScreen(),
           ));
         }
       }

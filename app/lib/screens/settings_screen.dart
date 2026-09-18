@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../constants/app_constants.dart';
 import '../theme/app_theme.dart';
+import 'gender_selection_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   final VoidCallback? onToggleTheme;
@@ -214,6 +215,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 ],
               ),
+            ),
+
+            // ── Companion
+            _section('Companion'),
+            GlassCard(
+              onTap: () {
+                Navigator.push(context, MaterialPageRoute(
+                  builder: (_) => const GenderSelectionScreen(isFromSettings: true),
+                ));
+              },
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+              child: Row(children: [
+                Icon(Icons.favorite_outline, color: AppColors.greenMedium, size: 20),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Companion Gender', style: TextStyle(color: AppTheme.textMain, fontWeight: FontWeight.w500)),
+                      Text('Choose your AI companion', style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right, color: AppTheme.textMuted),
+              ]),
             ),
 
             // ── Timetable settings

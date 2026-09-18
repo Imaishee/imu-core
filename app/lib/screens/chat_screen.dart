@@ -206,6 +206,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         actions: [
           IconButton(
             onPressed: () {
+              Navigator.pushNamed(context, '/friends');
+            },
+            icon: Icon(Icons.people_outline, color: AppTheme.textMain),
+          ),
+          IconButton(
+            onPressed: () {
               Navigator.pop(context);
               ref.read(activeConversationProvider.notifier).set(null);
             },
