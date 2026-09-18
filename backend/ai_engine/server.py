@@ -389,6 +389,136 @@ async def generate_pdf(req: dict):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ─── MongoDB Chat Data Export ───────────────────────────────────────────────────
+
+MONGO_URI = os.environ.get("MONGO_URI", "")
+
+
+@app.get("/export-conversations")
+async def export_conversations(limit: int = 1000, format: str = "jsonl"):
+    """Export chat conversations from MongoDB for further training.
+
+    Query params:
+        limit: max conversations to export (default 1000)
+        format: 'jsonl' (one JSON per line) or 'json' (array)
+
+    Returns a downloadable file with all conversation pairs ready for
+    retraining the IMU_Heart model.
+    """
+    if not MONGO_URI:
+        raise HTTPException(status_code=500, detail="MONGO_URI not configured")
+
+    try:
+        from motor.motor_asyncio import AsyncIOMotorClient
+
+        client = AsyncIOMotorClient(MONGO_URI)
+        db = client.get_database("imu")
+        conversations_col = db["conversations"]
+        messages_col = db["chat_messages"]
+
+        # Fetch conversations with their messages
+        cursor = conversations_col.find().sort("updated_at", -1).limit(limit)
+        conversations = await cursor.to_list(length=limit)
+
+        export_data = []
+        for conv in conversations:
+            conv_id = str(conv["_id"])
+            user_id = conv.get("user_id", "")
+
+            # Get messages for this conversation
+            msg_cursor = messages_col.find({"conversation_id": conv_id}).sort(
+                "created_at", 1
+            )
+            messages = await msg_cursor.to_list(length=500)
+
+            # Build training pairs from consecutive messages
+            for i in range(len(messages) - 1):
+                curr = messages[i]
+                nxt = messages[i + 1]
+
+                if curr.get("role") == nxt.get("role"):
+                    continue
+
+                export_data.append(
+                    {
+                        "input_text": curr.get("content", ""),
+                        "output_text": nxt.get("content", ""),
+                        "input_speaker": "user"
+                        if curr.get("role") == "user"
+                        else "assistant",
+                        "output_speaker": "user"
+                        if nxt.get("role") == "user"
+                        else "assistant",
+                        "input_mood": curr.get("mood", "normal"),
+                        "output_mood": nxt.get("mood", "normal"),
+                        "output_intent": nxt.get("intent", "normal"),
+                        "time_of_day": curr.get("time_of_day", "normal"),
+                        "mood_shift": "stable",
+                        "user_id": user_id,
+                        "conversation_id": conv_id,
+                        "source": "live_chat",
+                    }
+                )
+
+        client.close()
+
+        # Return as downloadable file
+        import io
+        from fastapi.responses import StreamingResponse
+
+        if format == "jsonl":
+            content = "\n".join(json.dumps(d, ensure_ascii=False) for d in export_data)
+            return StreamingResponse(
+                io.BytesIO(content.encode("utf-8")),
+                media_type="application/octet-stream",
+                headers={
+                    "Content-Disposition": f"attachment; filename=imu_training_export.jsonl"
+                },
+            )
+        else:
+            content = json.dumps(export_data, ensure_ascii=False, indent=2)
+            return StreamingResponse(
+                io.BytesIO(content.encode("utf-8")),
+                media_type="application/octet-stream",
+                headers={
+                    "Content-Disposition": f"attachment; filename=imu_training_export.json"
+                },
+            )
+
+    except Exception as e:
+        logger.error(f"Export error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/export-stats")
+async def export_stats():
+    """Get stats about exported data available for retraining."""
+    if not MONGO_URI:
+        return {"status": "MONGO_URI not configured", "conversations": 0, "messages": 0}
+
+    try:
+        from motor.motor_asyncio import AsyncIOMotorClient
+
+        client = AsyncIOMotorClient(MONGO_URI)
+        db = client.get_database("imu")
+
+        conv_count = await db["conversations"].count_documents({})
+        msg_count = await db["chat_messages"].count_documents({})
+        user_count = await db["chat_messages"].distinct("user_id")
+
+        client.close()
+
+        return {
+            "status": "ok",
+            "conversations": conv_count,
+            "total_messages": msg_count,
+            "unique_users": len(user_count),
+            "estimated_training_pairs": max(0, msg_count - conv_count),
+        }
+    except Exception as e:
+        return {"status": "error", "detail": str(e)}
+
+
 # ─── Main ──────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
