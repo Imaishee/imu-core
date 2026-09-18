@@ -1,55 +1,60 @@
-# Dependencies
+# Build outputs
 node_modules/
-.dart_tool/
-.packages
-build/
+landing/node_modules/
+landing/out/
+landing/.next/
+admin/node_modules/
+admin/.next/
+admin/.env
+app/build/
+app/.gradle/
+*.apk
+*.aab
 
-# Environment
-.env
-.env.local
-.env*.local
+# Pub/Flutter cache
+.pub-cache/
+.dart_tool/
+build/
 
 # IDE
 .idea/
 .vscode/
-*.iml
 
-# Flutter
-*.apk
-*.aab
-*.ipa
-*.dSYM.zip
-*.dSYM
+# Playwright
+.playwright-mcp/
 
-# Next.js
-.next/
-out/
-.vercel
+# Python
+__pycache__/
+*.pyc
+.ruff_cache/
 
-# Screenshots
-screenshot-*.png
-
-# Build
-dist/
-build/
-
-# Misc
-.DS_Store
-*.pem
-npm-debug.log*
+# Environment & credentials (NEVER commit)
+.env
+.env.local
+.env*.local
 info/
-
-# Supabase
-supabase/.temp/
-.pub-cache/
-
-# Credentials (NEVER commit)
 backend/secrets/
 backend/.secret_body*.json
 backend/firebase-service-account.json
 backend/inspect_chat_tables.js
 backend/migrate_location.js
-database.db*
-undefined/
 
-.vercel
+# Large dataset files (keep in local only)
+backend/ai_engine/clean_dataset.jsonl
+backend/ai_engine/conversation_pairs.jsonl
+backend/ai_engine/dataset_stats.json
+
+# Database files
+database.db
+database.db-shm
+database.db-wal
+
+# Temp/misc
+_run_migration.js
+undefined/
+dist/
+*.lock
+*.log
+
+# Vercel
+.vercel/

@@ -1,0 +1,86 @@
+[Engine] Loaded 27171 conversation pairs
+[Engine] Markov chain trained on 27171 replies
+Pairs: 27171
+Markov states: 23109
+
+Input: Ki korchis?
+Output: Kichu na 🌅
+  mood: happy intent: greeting
+
+Input: Bhalobashi tomake
+Output: 🫨🫨🫨🫨🫨🫨🫨🫨🫨🫨🫨🫨🫨🫨🫨🫨🫨🫨🫨🫨🫨🫨🫨🫨🫨🫨🫨🫨🫨🫨🫨🫨🫨🫨🫨🫨🫨🫨🫨🫨🫨🫨🫨🫨🫨🫨🫨🫨🫨 🥰
+  mood: loving intent: love
+
+Input: Good morning
+Output: 🙂hm 🌅
+  mood: happy intent: greeting
+
+Input: Miss korchi
+Output: Trpr shealdah 🫠
+  mood: loving intent: love
+
+Input: Khabar ki kheyechis?
+Output: Ami debo o na 🤔
+  mood: normal intent: question
+
+Input: Ki porishona korcho?
+Output: Are tomar type kora ki 🤔
+  mood: normal intent: question
+
+Input: Bore hocchi
+Output: Hasi pacche tai Orokom takiyechi 😔
+  mood: caring intent: sad
+
+Input: Tui ki sob theke sundor
+Output: 😂 😘
+  mood: playful intent: flirty
+
+Input: Good night
+Output: 😒 💫
+  mood: happy intent: greeting
+
+Input: Accha thak bye
+Output: 😒tumi suye thako 😴
+  mood: sad intent: farewell
+
+Input: Raag hoyeche
+Output: Kichu hoy ni ki bolbo 😒
+  mood: concerned intent: angry
+
+Input: Ei
+Output: Ki holo
+  mood: happy intent: greeting
+
+Input: Ki khobor
+Output: Tomar ki matha kharap 😐 😶
+  mood: normal intent: question
+
+Input: Ami tui ke miss korchi
+Output: 😳 💗
+  mood: loving intent: love
+
+Input: Oiiii
+Output: Kichu na 😌
+  mood: normal intent: normal
+
+Input: Ki kore
+Output: Jani na Ami o shock result dakhe🙂
+  mood: normal intent: question
+
+Input: Valobashi
+Output: vule jay amy otai tomar jonno vlo 🙂
+  mood: loving intent: love
+
+Input: Tumi ki amake bhalobaso?
+Output: Na porus ami sob pari na.upse amr okaud er baire😂 🧐
+  mood: normal intent: question
+
+Input: Hate you
+Output: Ha boleche
+  mood: concerned intent: angry
+
+Input: Cha khabo
+Output: 👍 🍕
+  mood: normal intent: food
+
+DONE - all 20 tests passed
