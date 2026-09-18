@@ -42,5 +42,11 @@ supabase/.temp/
 
 # Credentials (NEVER commit)
 backend/secrets/
+backend/.secret_body*.json
+backend/firebase-service-account.json
+backend/inspect_chat_tables.js
+backend/migrate_location.js
+database.db*
+undefined/
 
 .vercel
