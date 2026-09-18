@@ -50,7 +50,8 @@ class AlarmService {
       try {
         final deviceZone = await FlutterTimezone.getLocalTimezone();
         tz.setLocalLocation(tz.getLocation(deviceZone));
-      } catch (_) {
+      } catch (e) {
+        print('[AlarmService] Timezone detection fallback: $e');
         // Fall back to an offset guess if the plugin is unavailable.
         final offset = DateTime.now().timeZoneOffset;
         tz.setLocalLocation(tz.getLocation(
@@ -124,6 +125,7 @@ class AlarmService {
 
       _initialized = true;
     } catch (e) {
+      print('[AlarmService] Init error: $e');
       // ignore — app should still run
     }
   }
@@ -140,7 +142,8 @@ class AlarmService {
       final granted = await androidImpl?.requestExactAlarmsPermission();
       _exactDenied = granted == false;
       return granted ?? true;
-    } catch (_) {
+    } catch (e) {
+      print('[AlarmService] Exact alarm permission error: $e');
       return false;
     }
   }
@@ -152,7 +155,8 @@ class AlarmService {
           AndroidFlutterLocalNotificationsPlugin>();
       final allowed = await androidImpl?.canScheduleExactNotifications();
       return allowed ?? true;
-    } catch (_) {
+    } catch (e) {
+      print('[AlarmService] canScheduleExact error: $e');
       return true;
     }
   }
@@ -263,7 +267,8 @@ class AlarmService {
           audioAttributesUsage: AudioAttributesUsage.notification,
         ),
       );
-    } catch (_) {
+    } catch (e) {
+      print('[AlarmService] Admin channel creation error: $e');
       // channel creation is best-effort
     }
   }
@@ -327,7 +332,8 @@ class AlarmService {
     } on PlatformException catch (e) {
       if (e.code != 'exact_alarms_not_permitted') rethrow;
       _exactDenied = true;
-    } catch (_) {
+    } catch (e) {
+      print('[AlarmService] _scheduleSafe inexact fallback: $e');
       // fall through to inexact
     }
 
@@ -488,7 +494,8 @@ class AlarmService {
         if (!item.enabled) continue;
         await scheduleAlarm(item);
       }
-    } catch (_) {
+    } catch (e) {
+      print('[AlarmService] rearmSavedAlarms error: $e');
       // never block app startup on alarm re-arming
     }
   }
@@ -527,7 +534,8 @@ class AlarmService {
         } else {
           await cancelClass(c);
         }
-      } catch (_) {
+      } catch (e) {
+        print('[AlarmService] rescheduleAll error for class ${c.courseCode}: $e');
         // one bad entry must not abort the rest of the timetable
       }
     }

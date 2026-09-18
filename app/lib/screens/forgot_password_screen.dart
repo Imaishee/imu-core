@@ -35,12 +35,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       // password — no broken redirect needed.
       await Future.delayed(const Duration(milliseconds: 300));
       if (mounted) {
-        _loading = false;
         Navigator.push(context, MaterialPageRoute(
           builder: (_) => OtpScreen(email: email, flow: OtpFlow.recovery),
         ));
       }
-    } catch (_) {
+    } catch (e) {
+      print('[ForgotPassword] Send reset link error: $e');
       setState(() => _error = 'Something went wrong. Please try again.');
     }
 

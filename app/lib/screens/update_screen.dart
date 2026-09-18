@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../services/update_service.dart';
 
 class UpdateScreen extends StatefulWidget {
@@ -11,15 +10,36 @@ class UpdateScreen extends StatefulWidget {
 }
 
 class _UpdateScreenState extends State<UpdateScreen> {
+  final _updateService = UpdateService();
   bool _downloading = false;
+  double _progress = 0;
+  String _statusText = '';
 
-  Future<void> _downloadUpdate() async {
-    setState(() => _downloading = true);
-    final url = Uri.parse(widget.updateInfo.downloadUrl);
-    if (await canLaunchUrl(url)) {
-      await launchUrl(url, mode: LaunchMode.externalApplication);
+  @override
+  void initState() {
+    super.initState();
+    // Auto-start download on force update screens
+    if (widget.updateInfo.forceUpdate) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _startDownload());
     }
-    setState(() => _downloading = false);
+  }
+
+  Future<void> _startDownload() async {
+    if (_downloading) return;
+    setState(() {
+      _downloading = true;
+      _statusText = 'Preparing download...';
+    });
+
+    // Start background download — notification handles progress UI
+    await _updateService.downloadAndInstall(widget.updateInfo);
+
+    if (mounted) {
+      setState(() {
+        _downloading = false;
+        _statusText = 'Download complete! Install the update from notifications.';
+      });
+    }
   }
 
   @override
@@ -87,13 +107,50 @@ class _UpdateScreenState extends State<UpdateScreen> {
                       ],
                     ),
                   ),
+                // Download progress indicator
+                if (_downloading) ...[
+                  const SizedBox(height: 24),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF18181B),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFF27272A)),
+                    ),
+                    child: Column(
+                      children: [
+                        LinearProgressIndicator(
+                          value: _progress > 0 ? _progress / 100 : null,
+                          backgroundColor: const Color(0xFF27272A),
+                          valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                          minHeight: 4,
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          _statusText.isNotEmpty
+                              ? _statusText
+                              : 'Downloading in background...',
+                          style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 13),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'You can continue using the app. Progress is shown in notifications.',
+                          style: TextStyle(color: Colors.white.withAlpha(100), fontSize: 11),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 const Spacer(),
                 // Download button
                 SizedBox(
                   width: double.infinity,
                   height: 52,
                   child: ElevatedButton(
-                    onPressed: _downloading ? null : _downloadUpdate,
+                    onPressed: _downloading ? null : _startDownload,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.white,
                       foregroundColor: Colors.black,
@@ -105,7 +162,7 @@ class _UpdateScreenState extends State<UpdateScreen> {
                             height: 24,
                             child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
                           )
-                        : const Text('Download Update', style: TextStyle(fontWeight: FontWeight.w600)),
+                        : const Text('Upgrade Now', style: TextStyle(fontWeight: FontWeight.w600)),
                   ),
                 ),
                 if (!widget.updateInfo.forceUpdate) ...[

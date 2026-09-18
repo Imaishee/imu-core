@@ -26,17 +26,17 @@ class _VerificationScreenState extends State<VerificationScreen> {
   void _startPolling() {
     _timer = Timer.periodic(const Duration(seconds: 3), (_) async {
       try {
-        final session = Supabase.instance.client.auth.currentSession;
-        final user = Supabase.instance.client.auth.currentUser;
+        // getUser() actually hits the server and refreshes the session,
+        // unlike currentSession which only reads the cached local state.
+        final response = await Supabase.instance.client.auth.getUser();
+        final user = response.user;
         if (user != null && user.emailConfirmedAt != null && mounted) {
           _timer?.cancel();
           Navigator.pushReplacementNamed(context, '/home');
         }
-        // Also try to refresh the session
-        if (session != null && user != null && user.emailConfirmedAt == null) {
-          await Supabase.instance.client.auth.getSession();
-        }
-      } catch (_) {}
+      } catch (e) {
+        print('[Verification] Polling error: $e');
+      }
     });
   }
 
@@ -62,7 +62,8 @@ class _VerificationScreenState extends State<VerificationScreen> {
           ),
         );
       }
-    } catch (_) {
+    } catch (e) {
+      print('[Verification] Resend email error: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

@@ -20,7 +20,8 @@ class VoiceService {
       if (status.isGranted) return true;
       final result = await Permission.microphone.request();
       return result.isGranted;
-    } catch (_) {
+    } catch (e) {
+      print('[Voice] Permission error: $e');
       return false;
     }
   }

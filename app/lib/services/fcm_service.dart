@@ -13,7 +13,9 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   // delivered to the system tray by Android's FCM service.
   try {
     await Firebase.initializeApp();
-  } catch (_) {}
+  } catch (e) {
+    print('[FCM] Background Firebase init error: $e');
+  }
 
   // Re-register the token so the server always has a valid target.
   try {
@@ -21,7 +23,9 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     if (token != null) {
       await _bgStoreToken(token);
     }
-  } catch (_) {}
+  } catch (e) {
+    print('[FCM] Background token refresh error: $e');
+  }
 }
 
 /// Store FCM token from a background isolate.  We spin up a fresh Supabase
@@ -44,7 +48,9 @@ Future<void> _bgStoreToken(String token) async {
       },
       onConflict: 'user_id,token',
     );
-  } catch (_) {}
+  } catch (e) {
+    print('[FCM] Background token store error: $e');
+  }
 }
 
 /// Handles FCM token registration and foreground message display.
@@ -99,7 +105,8 @@ class FcmService {
         },
         onConflict: 'user_id,token',
       );
-    } catch (_) {
+    } catch (e) {
+      print('[FCM] Token store error: $e');
       // Token storage is best-effort; the app works without it.
     }
   }

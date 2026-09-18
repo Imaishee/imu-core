@@ -32,7 +32,9 @@ class ChatSyncService {
         'created_at': convo.createdAt.toIso8601String(),
         'updated_at': convo.updatedAt.toIso8601String(),
       }, onConflict: 'id');
-    } catch (_) {}
+    } catch (e) {
+      print('[ChatSync] Error syncing conversation ${convo.remoteId}: $e');
+    }
   }
 
   /// Insert a single message row.
@@ -51,7 +53,9 @@ class ChatSyncService {
         'model': msg.model,
         'created_at': msg.createdAt.toIso8601String(),
       });
-    } catch (_) {}
+    } catch (e) {
+      print('[ChatSync] Error syncing message to $conversationId: $e');
+    }
   }
 
   /// Update a conversation title.
@@ -62,6 +66,8 @@ class ChatSyncService {
         'title': title,
         'updated_at': DateTime.now().toIso8601String(),
       }).eq('id', conversationId);
-    } catch (_) {}
+    } catch (e) {
+      print('[ChatSync] Error syncing title for $conversationId: $e');
+    }
   }
 }

@@ -66,7 +66,9 @@ class ArtifactCard extends StatelessWidget {
         behavior: SnackBarBehavior.floating,
       ));
       await ArtifactService.share(file, subject: title);
-    } catch (_) {}
+    } catch (e) {
+      print('[ArtifactCard] Download error: $e');
+    }
   }
 
   Future<void> _preview() async {

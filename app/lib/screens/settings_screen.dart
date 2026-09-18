@@ -32,6 +32,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _load();
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Sync dark mode state from SharedPreferences after parent toggles theme.
+    // The parent calls onToggleTheme which changes the theme, then rebuilds
+    // this widget — but _isDark may be stale. Reload it.
+    _syncDarkMode();
+  }
+
+  Future<void> _syncDarkMode() async {
+    final prefs = await SharedPreferences.getInstance();
+    final stored = prefs.getBool('dark_mode') ?? false;
+    if (stored != _isDark && mounted) {
+      setState(() => _isDark = stored);
+    }
+  }
+
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
     final profile = await _loadProfile();
@@ -179,9 +196,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 children: [
                   SwitchListTile(
                     value: _isDark,
-                    onChanged: (v) {
-                      widget.onToggleTheme?.call();
+                    onChanged: (v) async {
+                      final prefs = await SharedPreferences.getInstance();
+                      await prefs.setBool('dark_mode', v);
                       setState(() => _isDark = v);
+                      widget.onToggleTheme?.call();
                     },
                     title: Text('Dark Mode', style: TextStyle(color: AppTheme.textMain)),
                     subtitle: Text('Toggle between light & dark', style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),

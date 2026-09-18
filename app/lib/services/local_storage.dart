@@ -6,6 +6,7 @@ import '../models/chat_message.dart';
 class LocalStorage {
   static const _conversationsKey = 'imu_conversations';
   static const _messagesPrefix = 'imu_messages_';
+  static const int defaultPageSize = 30;
 
   Future<void> saveConversations(List<Conversation> conversations) async {
     final prefs = await SharedPreferences.getInstance();
@@ -45,6 +46,7 @@ class LocalStorage {
     await prefs.setString(key, jsonEncode(jsonList));
   }
 
+  /// Load all messages (kept for backward compatibility).
   Future<List<ChatMessage>> loadMessages(String conversationId) async {
     final prefs = await SharedPreferences.getInstance();
     final key = '$_messagesPrefix$conversationId';
@@ -53,5 +55,34 @@ class LocalStorage {
 
     final jsonList = List<Map<String, dynamic>>.from(jsonDecode(data));
     return jsonList.map((j) => ChatMessage.fromJson(j)).toList();
+  }
+
+  /// Load the most recent [pageSize] messages for a conversation.
+  /// Returns (messages, hasMore) where hasMore indicates older messages exist.
+  Future<(List<ChatMessage>, bool)> loadMessagesPage(
+    String conversationId, {
+    int pageSize = defaultPageSize,
+  }) async {
+    final all = await loadMessages(conversationId);
+    if (all.length <= pageSize) {
+      return (all, false);
+    }
+    final start = all.length - pageSize;
+    return (all.sublist(start), true);
+  }
+
+  /// Load an older page of messages. [offset] is how many messages to skip
+  /// from the end (e.g. after loading the first page of 30, offset=30 loads
+  /// the next 30 older messages).
+  Future<List<ChatMessage>> loadMessagesPageOffset(
+    String conversationId, {
+    required int offset,
+    int pageSize = defaultPageSize,
+  }) async {
+    final all = await loadMessages(conversationId);
+    final end = all.length - offset;
+    if (end <= 0) return [];
+    final start = end - pageSize;
+    return all.sublist(start < 0 ? 0 : start, end);
   }
 }

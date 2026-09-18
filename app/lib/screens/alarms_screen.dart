@@ -78,14 +78,15 @@ class _AlarmsScreenState extends State<AlarmsScreen> {
   Future<void> _toggleAlarm(AlarmItem item, bool enabled) async {
     final idx = _alarms.indexWhere((a) => a.id == item.id);
     if (idx < 0) return;
-    _alarms[idx] = item.copyWith(enabled: enabled);
+    final updated = item.copyWith(enabled: enabled);
+    _alarms[idx] = updated;
     setState(() {});
     await _save();
 
     if (enabled) {
-      await _scheduleNotification(item);
+      await _scheduleNotification(updated);
     } else {
-      await AlarmService.cancelAlarm(item);
+      await AlarmService.cancelAlarm(updated);
     }
   }
 

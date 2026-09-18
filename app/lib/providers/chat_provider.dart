@@ -156,7 +156,9 @@ class MessagesNotifier extends Notifier<List<ChatMessage>> {
             // Still let the AI respond with a friendly confirmation.
           }
         }
-      } catch (_) {}
+      } catch (e) {
+        print('[ChatProvider] Vision parse error: $e');
+      }
     }
 
     final convoNotifier = ref.read(conversationsProvider.notifier);
@@ -198,7 +200,9 @@ class MessagesNotifier extends Notifier<List<ChatMessage>> {
             'instructor': c.instructor,
           }).toList();
         }
-      } catch (_) {}
+      } catch (e) {
+        print('[ChatProvider] Load timetable context error: $e');
+      }
       try {
         final alarms = await AiActionsService.loadAlarms();
         if (alarms.isNotEmpty) {
@@ -208,7 +212,9 @@ class MessagesNotifier extends Notifier<List<ChatMessage>> {
             'days': a.days,
           }).toList();
         }
-      } catch (_) {}
+      } catch (e) {
+        print('[ChatProvider] Load alarms context error: $e');
+      }
 
       // Chunk buffer: accumulate text, flush to state every 50ms to reduce rebuilds.
       final StringBuffer _chunkBuffer = StringBuffer();
@@ -335,7 +341,8 @@ class MessagesNotifier extends Notifier<List<ChatMessage>> {
         ];
         ref.read(localStorageProvider).saveMessages(_conversationId, state);
       }
-    } catch (_) {
+    } catch (e) {
+      print('[ChatProvider] Background actions error: $e');
       // Silently ignore — the chat response is already shown
     }
   }

@@ -698,7 +698,9 @@ class _MessageActions extends StatelessWidget {
           feedback == 'like' ? 'Thanks for the feedback!' : 'Thanks, we\'ll improve!',
         ));
       }
-    } catch (_) {}
+    } catch (e) {
+      print('[ChatScreen] Feedback submit error: $e');
+    }
   }
 }
 

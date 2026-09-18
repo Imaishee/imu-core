@@ -34,8 +34,11 @@ class DeepLinkService {
       _appLinks.uriLinkStream.listen((uri) {
         _controller.add(uri);
         _handleLink(uri);
-      }, onError: (_) {});
-    } catch (_) {
+      }, onError: (e) {
+        print('[DeepLink] URI stream error: $e');
+      });
+    } catch (e) {
+      print('[DeepLink] Init failed: $e');
       // Deep linking unavailable — app still works, just no link handling
     }
   }
@@ -49,6 +52,8 @@ class DeepLinkService {
       if (uri.host == 'auth' || uri.path.contains('auth')) {
         Supabase.instance.client.auth.recoverSession(uri.toString());
       }
-    } catch (_) {}
+    } catch (e) {
+      print('[DeepLink] Failed to handle link $uri: $e');
+    }
   }
 }
