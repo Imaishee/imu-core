@@ -319,6 +319,76 @@ async def stats():
     return engine.stats()
 
 
+# ─── PDF Generation ─────────────────────────────────────────────────────────────
+
+
+@app.post("/generate-pdf")
+async def generate_pdf(req: dict):
+    """Generate a real PDF from content using reportlab."""
+    try:
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.colors import HexColor
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+        from reportlab.lib.units import mm
+        import io
+        import tempfile
+
+        title = req.get("title", "Document")
+        content = req.get("content", "")
+
+        # Create temp file for PDF
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+            pdf_path = tmp.name
+
+        doc = SimpleDocTemplate(
+            pdf_path,
+            pagesize=A4,
+            topMargin=20 * mm,
+            bottomMargin=20 * mm,
+            leftMargin=20 * mm,
+            rightMargin=20 * mm,
+        )
+
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle(
+            "CustomTitle",
+            parent=styles["Heading1"],
+            textColor=HexColor("#1F2A24"),
+            fontSize=18,
+        )
+        body_style = ParagraphStyle(
+            "CustomBody",
+            parent=styles["Normal"],
+            fontSize=11,
+            leading=16,
+            textColor=HexColor("#333333"),
+        )
+
+        story = []
+        story.append(Paragraph(title, title_style))
+        story.append(Spacer(1, 12))
+
+        # Split content into paragraphs
+        for para in content.split("\n"):
+            if para.strip():
+                story.append(Paragraph(para.strip(), body_style))
+                story.append(Spacer(1, 6))
+
+        doc.build(story)
+
+        from fastapi.responses import FileResponse
+
+        return FileResponse(
+            pdf_path, media_type="application/pdf", filename=f"{title}.pdf"
+        )
+    except ImportError:
+        raise HTTPException(status_code=500, detail="reportlab not installed")
+    except Exception as e:
+        logger.error(f"PDF generation error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ─── Main ──────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
