@@ -4,6 +4,7 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://imaishee.vercel.app'),
   title: "I'MU — Your AI",
   description: "An AI that listens, learns, and adapts. Built for students who want smarter studying.",
   icons: {
