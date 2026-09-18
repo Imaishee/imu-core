@@ -157,6 +157,40 @@ body {
   flex-shrink: 0;
 }
 
+/* ── Chat code blocks ── */
+.chat-code-block {
+  background: rgba(45, 106, 79, 0.06);
+  border: 1px solid rgba(45, 106, 79, 0.12);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin: 8px 0;
+  overflow-x: auto;
+  font-size: 12px;
+  line-height: 1.5;
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', Consolas, monospace;
+  color: #1F2A24;
+  -webkit-overflow-scrolling: touch;
+}
+
+.chat-code-block code {
+  font-family: inherit;
+}
+
+/* ── Mobile touch targets ── */
+@media (max-width: 640px) {
+  .glass-card {
+    border-radius: 14px;
+  }
+  .icon-circle {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+  }
+  .glass-card:hover {
+    transform: none;
+  }
+}
+
 /* ── Scrollbar ── */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: var(--bg); }
