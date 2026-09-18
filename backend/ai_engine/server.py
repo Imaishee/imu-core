@@ -21,7 +21,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from companion_engine import get_engine
-from imu_heart_inference import get_inference, load_model as load_imu_heart
 
 # ─── Config ────────────────────────────────────────────────────────────────────
 
@@ -31,6 +30,15 @@ GROQ_MODEL = "llama-3.3-70b-versatile"
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("imu-companion")
+
+# IMU_Heart is optional — lazy loaded so torch doesn't block server start
+_imu_heart_available = False
+try:
+    from imu_heart_inference import get_inference, load_model as load_imu_heart
+
+    _imu_heart_available = True
+except ImportError as e:
+    logger.warning(f"IMU_Heart inference not available: {e}")
 
 # ─── Lifespan ──────────────────────────────────────────────────────────────────
 
@@ -45,17 +53,21 @@ async def lifespan(app: FastAPI):
     )
 
     # Load IMU_Heart neural model (optional, non-blocking)
-    try:
-        imu_loaded = load_imu_heart()
-        if imu_loaded:
-            inference = get_inference()
-            logger.info(
-                f"IMU_Heart model loaded: {inference.model.count_parameters():,} params"
+    if _imu_heart_available:
+        try:
+            imu_loaded = load_imu_heart()
+            if imu_loaded:
+                inference = get_inference()
+                param_count = sum(p.numel() for p in inference.model.parameters())
+                logger.info(f"IMU_Heart model loaded: {param_count:,} params")
+            else:
+                logger.warning("IMU_Heart model not available (missing model files)")
+        except Exception as e:
+            logger.warning(
+                f"IMU_Heart model load failed: {e} — using Markov engine only"
             )
-        else:
-            logger.warning("IMU_Heart model not available (missing model files)")
-    except Exception as e:
-        logger.warning(f"IMU_Heart model load failed: {e} — using Markov engine only")
+    else:
+        logger.warning("IMU_Heart module not installed — using Markov engine only")
 
     yield
     logger.info("Shutting down...")
@@ -228,14 +240,21 @@ async def root():
 async def health():
     engine = get_engine()
     stats = engine.stats()
-    inference = get_inference()
+    imu_loaded = False
+    imu_params = 0
+    if _imu_heart_available:
+        try:
+            inference = get_inference()
+            imu_loaded = inference.loaded
+            if imu_loaded:
+                imu_params = sum(p.numel() for p in inference.model.parameters())
+        except Exception:
+            pass
     return {
         "status": "ok",
         "pairs": stats["pairs"],
-        "imu_heart_loaded": inference.loaded,
-        "imu_heart_params": inference.model.count_parameters()
-        if inference.loaded
-        else 0,
+        "imu_heart_loaded": imu_loaded,
+        "imu_heart_params": imu_params,
     }
 
 
@@ -254,15 +273,16 @@ async def chat(req: ChatRequest):
     )
 
     # Layer 1b: Try IMU_Heart neural model for additional seed
-    inference = get_inference()
     neural_seed = None
-    if inference.loaded:
+    if _imu_heart_available:
         try:
-            neural_seed = inference.generate(
-                req.message.strip(), max_len=30, temperature=0.8
-            )
-            if neural_seed and len(neural_seed) < 3:
-                neural_seed = None  # Too short, discard
+            inference = get_inference()
+            if inference.loaded:
+                neural_seed = inference.generate(
+                    req.message.strip(), max_len=30, temperature=0.8
+                )
+                if neural_seed and len(neural_seed) < 3:
+                    neural_seed = None  # Too short, discard
         except Exception as e:
             logger.warning(f"IMU_Heart inference failed: {e}")
 

@@ -47,8 +47,8 @@ backend/ai_engine/conversation_pairs.jsonl
 backend/ai_engine/dataset_stats.json
 
 # Training artifacts (keep tokenizer and model for deployment)
-*.pt
-# *.pkl
+
+
 training_data.jsonl
 training_history.json
 training_stats.json
