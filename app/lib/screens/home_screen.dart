@@ -79,17 +79,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 Container(
                   width: 34, height: 34,
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(colors: [AppColors.greenPrimary, AppColors.greenLight], begin: Alignment.topLeft, end: Alignment.bottomRight),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(6),
-                      child: FittedBox(
-                        child: Text("I'MU", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                      ),
-                    ),
-                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: Image.asset('assets/icon.png', fit: BoxFit.cover),
                 ),
                 const SizedBox(width: 10),
                 Text("I'MU", style: TextStyle(fontWeight: FontWeight.w700, fontSize: 20, color: AppTheme.textMain)),

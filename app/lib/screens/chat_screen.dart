@@ -318,17 +318,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           Container(
             width: 64, height: 64,
             decoration: BoxDecoration(
-              gradient: const LinearGradient(colors: [AppColors.greenPrimary, AppColors.greenLight], begin: Alignment.topLeft, end: Alignment.bottomRight),
               borderRadius: BorderRadius.circular(18),
             ),
-            child: const Center(
-              child: Padding(
-                padding: EdgeInsets.all(12),
-                child: FittedBox(
-                  child: Text("I'MU", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                ),
-              ),
-            ),
+            clipBehavior: Clip.antiAlias,
+            child: Image.asset('assets/icon.png', fit: BoxFit.cover),
           ),
           const SizedBox(height: 16),
           Text("Hi, I'm I'MU", style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: AppTheme.textMain)),
@@ -604,15 +597,9 @@ class _AiMessage extends StatelessWidget {
         children: [
           Container(
             width: 28, height: 28,
-            decoration: BoxDecoration(color: AppColors.greenPrimary, borderRadius: BorderRadius.circular(10)),
-            child: const Center(
-              child: Padding(
-                padding: EdgeInsets.all(5),
-                child: FittedBox(
-                  child: Text("I'MU", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                ),
-              ),
-            ),
+            decoration: BoxDecoration(borderRadius: BorderRadius.circular(10)),
+            clipBehavior: Clip.antiAlias,
+            child: Image.asset('assets/icon.png', fit: BoxFit.cover),
           ),
           const SizedBox(width: 10),
           Expanded(

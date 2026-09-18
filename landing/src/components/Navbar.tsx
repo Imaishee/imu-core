@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import Logo from './Logo';
 
 const links = [
   { href: '/', label: 'Home' },
@@ -15,13 +16,11 @@ export default function Navbar() {
   const pathname = usePathname();
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 backdrop-blur-lg bg-imu-dark/80 border-b border-imu-border">
+    <nav className="fixed top-0 left-0 right-0 z-50 backdrop-blur-xl" style={{ background: 'rgba(14, 21, 18, 0.75)', borderBottom: '1px solid rgba(42, 59, 50, 0.5)' }}>
       <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center">
-            <span className="text-black font-bold text-sm">I&apos;M</span>
-          </div>
-          <span className="font-bold text-white text-lg tracking-tight">I&apos;MU</span>
+        <Link href="/" className="flex items-center gap-2.5">
+          <Logo size={36} rounded="lg" />
+          <span className="font-bold text-cream-text text-lg tracking-tight">I&apos;MU</span>
         </Link>
 
         <div className="hidden md:flex items-center gap-1">
@@ -31,9 +30,10 @@ export default function Navbar() {
               href={link.href}
               className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
                 pathname === link.href
-                  ? 'bg-white text-black'
-                  : 'text-imu-muted hover:text-white hover:bg-white/5'
+                  ? 'text-white'
+                  : 'text-cream-muted hover:text-cream-text'
               }`}
+              style={pathname === link.href ? { background: 'rgba(45, 106, 79, 0.3)', border: '1px solid rgba(82, 183, 136, 0.2)' } : {}}
             >
               {link.label}
             </Link>
@@ -42,7 +42,8 @@ export default function Navbar() {
 
         <Link
           href="/download"
-          className="bg-white text-black px-5 py-2 rounded-full text-sm font-semibold hover:bg-gray-200 transition-colors"
+          className="px-5 py-2 rounded-full text-sm font-semibold text-white transition-all cute-press"
+          style={{ background: 'linear-gradient(135deg, #2D6A4F, #40916C)' }}
         >
           Get App
         </Link>

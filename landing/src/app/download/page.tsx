@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
+import Logo from '@/components/Logo';
 
 export const metadata: Metadata = {
   title: "Download — I'MU",
@@ -11,9 +11,7 @@ export default function Download() {
     <>
       <section className="pt-32 pb-20 px-6">
         <div className="max-w-3xl mx-auto text-center">
-          <div className="w-24 h-24 bg-white rounded-2xl flex items-center justify-center mx-auto mb-8">
-            <span className="text-black font-black text-3xl">I&apos;M</span>
-          </div>
+          <Logo size={96} rounded="3xl" className="mx-auto mb-8" />
 
           <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
             Get I&apos;MU
@@ -26,9 +24,7 @@ export default function Download() {
           <div className="bg-imu-card border border-imu-border rounded-2xl p-8 md:p-12 mb-8">
             <div className="flex flex-col items-center gap-6">
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-emerald-500/10 rounded-xl flex items-center justify-center">
-                  <span className="text-2xl">🤖</span>
-                </div>
+                <Logo size={48} rounded="xl" />
                 <div className="text-left">
                   <p className="text-white font-semibold text-lg">Android APK</p>
                   <p className="text-imu-muted text-sm">Android 7.0+ &middot; ~25MB</p>

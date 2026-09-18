@@ -378,17 +378,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     Container(
                       width: 60, height: 60,
                       decoration: BoxDecoration(
-                        gradient: const LinearGradient(colors: [AppColors.greenPrimary, AppColors.greenLight], begin: Alignment.topLeft, end: Alignment.bottomRight),
                         borderRadius: BorderRadius.circular(16),
                       ),
-                      child: const Center(
-                        child: Padding(
-                          padding: EdgeInsets.all(11),
-                          child: FittedBox(
-                            child: Text("I'MU", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                          ),
-                        ),
-                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: Image.asset('assets/icon.png', fit: BoxFit.cover),
                     ),
                     const SizedBox(height: 14),
                     Text('I\'MU', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppTheme.textMain)),

@@ -59,17 +59,10 @@ class _UpdateScreenState extends State<UpdateScreen> {
                   width: 80,
                   height: 80,
                   decoration: BoxDecoration(
-                    color: Colors.white,
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(15),
-                      child: FittedBox(
-                        child: Text("I'MU", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-                      ),
-                    ),
-                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: Image.asset('assets/icon.png', fit: BoxFit.cover),
                 ),
                 const SizedBox(height: 24),
                 const Text(
