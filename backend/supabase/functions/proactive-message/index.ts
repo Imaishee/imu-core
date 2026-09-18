@@ -1,13 +1,10 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
 // Proactive message templates based on time of day
-const PROACTIVE_MESSAGES = {
+const PROACTIVE_MESSAGES: Record<string, Record<string, string[]>> = {
   morning: {
     female: [
       "Good morning 🌞",
@@ -74,16 +71,13 @@ const PROACTIVE_MESSAGES = {
   },
 };
 
-// Get random message for time period
 function getProactiveMessage(timePeriod: string, gender: string): string {
-  const messages = PROACTIVE_MESSAGES[timePeriod as keyof typeof PROACTIVE_MESSAGES];
+  const messages = PROACTIVE_MESSAGES[timePeriod];
   if (!messages) return "Ki korchis? 🫠";
-
-  const genderMessages = messages[gender as keyof typeof messages] || messages.female;
+  const genderMessages = messages[gender] || messages.female;
   return genderMessages[Math.floor(Math.random() * genderMessages.length)];
 }
 
-// Determine time period
 function getTimePeriod(): string {
   const hour = new Date().getHours();
   if (hour >= 6 && hour < 12) return "morning";
@@ -92,61 +86,64 @@ function getTimePeriod(): string {
   return "night";
 }
 
-serve(async (req) => {
+// Supabase REST helpers (no SDK needed)
+function supabaseHeaders(svcKey: string) {
+  return {
+    "apikey": svcKey,
+    "Authorization": `Bearer ${svcKey}`,
+    "Content-Type": "application/json",
+    "Prefer": "return=representation",
+  };
+}
+
+Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
   try {
-    // This function should be called by a scheduler (cron job)
-    // It sends proactive messages to all active users
-
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const svcKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const headers = supabaseHeaders(svcKey);
 
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
-    // Get users who were active in the last 24 hours
-    const { data: activeUsers, error: usersError } = await supabase
-      .from("profiles")
-      .select("id, companion_gender")
-      .gte("last_active_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+    // Get active users via REST
+    const usersResp = await fetch(
+      `${supabaseUrl}/rest/v1/profiles?id=not.is.null&last_active_at=gte.${cutoff}&select=id,companion_gender`,
+      { headers }
+    );
 
-    if (usersError || !activeUsers) {
-      console.error("Error fetching active users:", usersError);
+    if (!usersResp.ok) {
       return new Response(
-        JSON.stringify({ error: "Failed to fetch users" }),
+        JSON.stringify({ error: "Failed to fetch users", detail: await usersResp.text() }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
+    const activeUsers = await usersResp.json();
     const timePeriod = getTimePeriod();
     const results = [];
-
-    // Send proactive message to each user (limit to avoid rate limiting)
-    const usersToNotify = activeUsers.slice(0, 50); // Limit to 50 users per call
+    const usersToNotify = activeUsers.slice(0, 50);
 
     for (const user of usersToNotify) {
       try {
         const gender = user.companion_gender || "female";
         const message = getProactiveMessage(timePeriod, gender);
 
-        // Insert message into ai_messages table
-        const { error: insertError } = await supabase
-          .from("ai_messages")
-          .insert({
+        const insertResp = await fetch(`${supabaseUrl}/rest/v1/ai_messages`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
             user_id: user.id,
             role: "assistant",
             content: message,
             created_at: new Date().toISOString(),
-          });
+          }),
+        });
 
-        if (!insertError) {
-          results.push({ userId: user.id, success: true });
-        } else {
-          results.push({ userId: user.id, success: false, error: insertError.message });
-        }
-      } catch (e) {
+        results.push({ userId: user.id, success: insertResp.ok });
+      } catch {
         results.push({ userId: user.id, success: false, error: "Unknown error" });
       }
     }
@@ -156,15 +153,10 @@ serve(async (req) => {
         success: true,
         timePeriod,
         totalUsers: activeUsers.length,
-        notified: results.filter(r => r.success).length,
-        failed: results.filter(r => !r.success).length,
+        notified: results.filter((r: any) => r.success).length,
+        failed: results.filter((r: any) => !r.success).length,
       }),
-      {
-        headers: {
-          ...corsHeaders,
-          "Content-Type": "application/json",
-        },
-      }
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
     console.error("Proactive message error:", error);

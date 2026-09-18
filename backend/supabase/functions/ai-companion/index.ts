@@ -1,6 +1,3 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -91,7 +88,7 @@ function getTimeContext(mood: string): string {
   }
 }
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -123,9 +120,9 @@ serve(async (req) => {
       { role: "user", content: message },
     ];
 
-    // Call AI model (using the same model selection as chat function)
+    // Call AI model via Groq
     const model = "openai/gpt-oss-120b";
-    const apiKey = Deno.env.get("OPENAI_API_KEY") || Deno.env.get("OPENROUTER_API_KEY");
+    const apiKey = Deno.env.get("GROQ_API_KEY") || Deno.env.get("OPENAI_API_KEY") || Deno.env.get("OPENROUTER_API_KEY");
 
     if (!apiKey) {
       return new Response(
@@ -134,18 +131,16 @@ serve(async (req) => {
       );
     }
 
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${apiKey}`,
         "Content-Type": "application/json",
-        "HTTP-Referer": "https://imu-app.com",
-        "X-Title": "I'MU Companion",
       },
       body: JSON.stringify({
         model,
         messages,
-        max_tokens: 150, // Keep responses short
+        max_tokens: 300, // Reasoning models need more tokens for reasoning + output
         temperature: 0.9, // High creativity for personality
         top_p: 0.95,
       }),
@@ -161,7 +156,9 @@ serve(async (req) => {
     }
 
     const data = await response.json();
-    const aiMessage = data.choices?.[0]?.message?.content || "Hmm... ki bolbo 😶";
+    // Reasoning models put content in 'reasoning' field sometimes; check both
+    const choice = data.choices?.[0];
+    const aiMessage = choice?.message?.content || choice?.message?.reasoning || "Hmm... ki bolbo 😶";
 
     // Return response
     return new Response(
