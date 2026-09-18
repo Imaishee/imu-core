@@ -208,7 +208,9 @@ class IMUHeartModel(nn.Module):
         # Time gap feature
         tg = self.time_gap_proj(context["time_gap"].float().unsqueeze(-1))
 
-        # Inject context
+        # Inject context at first position
+        ctx = ctx.unsqueeze(1)  # [batch, 1, dim]
+        tg = tg.unsqueeze(1)  # [batch, 1, dim]
         x[:, 0:1] = x[:, 0:1] + ctx + tg
 
         # Encode

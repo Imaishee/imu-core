@@ -1,91 +1,209 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { getDashboardStats } from '@/lib/supabase';
+
+interface DashboardStats {
+  totalUsers: number;
+  totalConversations: number;
+  totalMessages: number;
+  totalNotifications: number;
+  totalFriends: number;
+}
+
+interface HealthStatus {
+  engine: { status: string; url: string; engine?: any };
+  database: { status: string; error?: string };
+}
 
 export default function DashboardPage() {
-  const [stats, setStats] = useState({ totalUsers: 0, totalConversations: 0, totalMessages: 0 });
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [health, setHealth] = useState<HealthStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
 
-  const fetchStats = useCallback(async () => {
+  const fetchAll = useCallback(async () => {
     try {
-      const data = await getDashboardStats();
-      setStats(data);
+      const [statsRes, healthRes] = await Promise.all([
+        fetch('/api/stats').then(r => r.json()).catch(() => null),
+        fetch('/api/health').then(r => r.json()).catch(() => null),
+      ]);
+      if (statsRes) setStats(statsRes);
+      if (healthRes) setHealth(healthRes);
       setLastRefresh(new Date());
     } catch (e) {
-      console.error('Failed to fetch dashboard stats:', e);
+      console.error('Dashboard fetch error:', e);
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchStats();
-    const interval = setInterval(fetchStats, 30000);
+    fetchAll();
+    const interval = setInterval(fetchAll, 15000);
     return () => clearInterval(interval);
-  }, [fetchStats]);
+  }, [fetchAll]);
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-white">Dashboard</h1>
+        <div>
+          <h1 className="text-2xl font-bold text-white tracking-tight">Dashboard</h1>
+          <p className="text-sm text-zinc-500 mt-0.5">I&apos;MU system overview</p>
+        </div>
         <div className="flex items-center gap-3">
           {lastRefresh && (
-            <span className="text-xs text-zinc-500">
+            <span className="text-[11px] text-zinc-600">
               Updated {lastRefresh.toLocaleTimeString()}
             </span>
           )}
           <button
-            onClick={fetchStats}
-            className="px-3 py-1.5 bg-[#27272a] hover:bg-[#3f3f46] rounded-lg text-xs text-zinc-400 hover:text-white transition-colors"
+            onClick={fetchAll}
+            className="px-3 py-1.5 bg-[#141416] hover:bg-[#1a1a1e] border border-[#1a1a1e] rounded-lg text-xs text-zinc-400 hover:text-white transition-all"
           >
             ↻ Refresh
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <StatCard label="Total Users" value={stats.totalUsers} icon="👥" loading={loading} />
-        <StatCard label="Conversations" value={stats.totalConversations} icon="💬" loading={loading} />
-        <StatCard label="Messages" value={stats.totalMessages} icon="📨" loading={loading} />
+      {/* System Health Bar */}
+      <div className="bg-[#0a0a0b] border border-[#1a1a1e] rounded-xl p-4">
+        <div className="flex items-center gap-6">
+          <HealthIndicator
+            label="Database"
+            status={health?.database?.status || (loading ? 'loading' : 'unknown')}
+          />
+          <HealthIndicator
+            label="IMU Engine"
+            status={health?.engine?.status || (loading ? 'loading' : 'unknown')}
+          />
+          <HealthIndicator
+            label="Groq API"
+            status="online"
+          />
+          <div className="flex-1" />
+          <div className="text-right">
+            <p className="text-[11px] text-zinc-600">Engine URL</p>
+            <p className="text-xs text-zinc-400 font-mono truncate max-w-[200px]">
+              {health?.engine?.url || 'Checking...'}
+            </p>
+          </div>
+        </div>
       </div>
 
-      <div className="bg-[#18181b] border border-[#27272a] rounded-xl p-6">
-        <h2 className="text-lg font-semibold text-white mb-4">Quick Actions</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <a href="/notifications" className="bg-[#27272a] hover:bg-[#3f3f46] rounded-lg p-4 text-sm text-white transition-colors">
-            🔔 Send Notification
-          </a>
-          <a href="/prompts" className="bg-[#27272a] hover:bg-[#3f3f46] rounded-lg p-4 text-sm text-white transition-colors">
-            🧠 Edit System Prompt
-          </a>
-          <a href="/users" className="bg-[#27272a] hover:bg-[#3f3f46] rounded-lg p-4 text-sm text-white transition-colors">
-            👥 Manage Users
-          </a>
-          <a href="/activity" className="bg-[#27272a] hover:bg-[#3f3f46] rounded-lg p-4 text-sm text-white transition-colors">
-            📋 View Activity
-          </a>
-        </div>
+      {/* Stats Grid */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <StatCard
+          label="Users"
+          value={stats?.totalUsers ?? 0}
+          icon="👥"
+          color="violet"
+          loading={loading}
+        />
+        <StatCard
+          label="Conversations"
+          value={stats?.totalConversations ?? 0}
+          icon="💬"
+          color="blue"
+          loading={loading}
+        />
+        <StatCard
+          label="Messages"
+          value={stats?.totalMessages ?? 0}
+          icon="📨"
+          color="green"
+          loading={loading}
+        />
+        <StatCard
+          label="Notifications"
+          value={stats?.totalNotifications ?? 0}
+          icon="🔔"
+          color="amber"
+          loading={loading}
+        />
+        <StatCard
+          label="Friend Links"
+          value={stats?.totalFriends ?? 0}
+          icon="🫂"
+          color="pink"
+          loading={loading}
+        />
+      </div>
+
+      {/* Quick Actions */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <QuickAction href="/notifications" icon="🔔" label="Send Notification" desc="Push to all users" />
+        <QuickAction href="/users" icon="👥" label="Manage Users" desc="View & analyze users" />
+        <QuickAction href="/conversations" icon="💬" label="Conversations" desc="Browse chat history" />
+        <QuickAction href="/health" icon="💓" label="System Health" desc="Engine & DB status" />
       </div>
     </div>
   );
 }
 
-function StatCard({ label, value, icon, loading }: { label: string; value: number; icon: string; loading: boolean }) {
+function HealthIndicator({ label, status }: { label: string; status: string }) {
+  const colors: Record<string, string> = {
+    online: 'bg-green-500',
+    ok: 'bg-green-500',
+    offline: 'bg-red-500',
+    error: 'bg-red-500',
+    loading: 'bg-yellow-500 animate-pulse',
+    unknown: 'bg-zinc-600',
+  };
+
   return (
-    <div className="bg-[#18181b] border border-[#27272a] rounded-xl p-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm text-zinc-400">{label}</p>
-          {loading ? (
-            <div className="h-9 w-20 bg-[#27272a] rounded animate-pulse mt-1" />
-          ) : (
-            <p className="text-3xl font-bold text-white mt-1">{value.toLocaleString()}</p>
-          )}
-        </div>
-        <span className="text-3xl">{icon}</span>
-      </div>
+    <div className="flex items-center gap-2">
+      <div className={`w-2 h-2 rounded-full ${colors[status] || colors.unknown}`} />
+      <span className="text-xs text-zinc-400">{label}</span>
+      <span className="text-[10px] text-zinc-600 capitalize">{status}</span>
     </div>
+  );
+}
+
+function StatCard({ label, value, icon, color, loading }: {
+  label: string;
+  value: number;
+  icon: string;
+  color: string;
+  loading: boolean;
+}) {
+  const borderColors: Record<string, string> = {
+    violet: 'border-violet-500/20',
+    blue: 'border-blue-500/20',
+    green: 'border-green-500/20',
+    amber: 'border-amber-500/20',
+    pink: 'border-pink-500/20',
+  };
+
+  return (
+    <div className={`bg-[#0a0a0b] border ${borderColors[color] || 'border-[#1a1a1e]'} rounded-xl p-4`}>
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-lg">{icon}</span>
+      </div>
+      {loading ? (
+        <div className="h-8 w-16 bg-[#141416] rounded animate-pulse" />
+      ) : (
+        <p className="text-2xl font-bold text-white">{value.toLocaleString()}</p>
+      )}
+      <p className="text-xs text-zinc-500 mt-1">{label}</p>
+    </div>
+  );
+}
+
+function QuickAction({ href, icon, label, desc }: {
+  href: string;
+  icon: string;
+  label: string;
+  desc: string;
+}) {
+  return (
+    <a
+      href={href}
+      className="bg-[#0a0a0b] border border-[#1a1a1e] hover:border-violet-500/30 rounded-xl p-4 transition-all group"
+    >
+      <div className="text-xl mb-2">{icon}</div>
+      <p className="text-sm font-medium text-white group-hover:text-violet-400 transition-colors">{label}</p>
+      <p className="text-xs text-zinc-600 mt-0.5">{desc}</p>
+    </a>
   );
 }

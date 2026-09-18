@@ -1,4 +1,4 @@
-# Build outputs
+﻿# Build outputs
 node_modules/
 landing/node_modules/
 landing/out/
@@ -6,6 +6,8 @@ landing/.next/
 admin/node_modules/
 admin/.next/
 admin/.env
+admin/.env.production
+admin/.env.vercel
 app/build/
 app/.gradle/
 *.apk
@@ -39,10 +41,17 @@ backend/firebase-service-account.json
 backend/inspect_chat_tables.js
 backend/migrate_location.js
 
-# Large dataset files (keep in local only)
+# Large dataset files
 backend/ai_engine/clean_dataset.jsonl
 backend/ai_engine/conversation_pairs.jsonl
 backend/ai_engine/dataset_stats.json
+
+# Training artifacts
+*.pt
+*.pkl
+training_data.jsonl
+training_history.json
+training_stats.json
 
 # Database files
 database.db

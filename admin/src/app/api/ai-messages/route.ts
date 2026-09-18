@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
-import { getUsers } from '@/lib/supabase';
+import { getAIMessages } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  const { users, error } = await getUsers();
+  const { data, error } = await getAIMessages();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ users });
+  return NextResponse.json({ messages: data });
 }

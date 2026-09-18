@@ -8,11 +8,10 @@ export default function ConversationsPage() {
   const [selected, setSelected] = useState<any>(null);
   const [messages, setMessages] = useState<any[]>([]);
   const [loadingMessages, setLoadingMessages] = useState(false);
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
     fetchConversations();
-    const interval = setInterval(fetchConversations, 30000);
-    return () => clearInterval(interval);
   }, []);
 
   async function fetchConversations() {
@@ -31,45 +30,64 @@ export default function ConversationsPage() {
     setLoadingMessages(false);
   }
 
+  const filtered = conversations.filter(c =>
+    c.title?.toLowerCase().includes(search.toLowerCase()) ||
+    c.user_id?.toLowerCase().includes(search.toLowerCase())
+  );
+
   if (selected) {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-3">
           <button
             onClick={() => { setSelected(null); setMessages([]); }}
-            className="text-zinc-400 hover:text-white transition-colors text-sm"
+            className="text-zinc-500 hover:text-white transition-colors text-sm"
           >
             ← Back
           </button>
-          <h1 className="text-2xl font-bold text-white">{selected.title}</h1>
-          <span className="text-xs text-zinc-500">
-            {selected.profiles?.name || 'Unknown'} · {selected.model}
-          </span>
+          <div>
+            <h1 className="text-lg font-bold text-white">{selected.title || 'Untitled'}</h1>
+            <p className="text-xs text-zinc-500 font-mono">
+              {selected.user_id?.slice(0, 12)}... · {selected.model} · {new Date(selected.created_at).toLocaleDateString()}
+            </p>
+          </div>
         </div>
 
-        <div className="bg-[#18181b] border border-[#27272a] rounded-xl p-6 space-y-4">
+        <div className="bg-[#0a0a0b] border border-[#1a1a1e] rounded-xl p-6 space-y-3">
           {loadingMessages ? (
-            <div className="text-zinc-400 text-sm">Loading messages...</div>
+            <div className="space-y-3">
+              {[1,2,3].map(i => (
+                <div key={i} className="h-16 bg-[#141416] rounded-lg animate-pulse" />
+              ))}
+            </div>
           ) : messages.length === 0 ? (
-            <div className="text-zinc-500 text-sm text-center py-8">No messages yet</div>
+            <div className="text-center py-12">
+              <span className="text-3xl">💬</span>
+              <p className="text-sm text-zinc-600 mt-3">No messages in this conversation</p>
+            </div>
           ) : (
             messages.map((msg: any) => (
               <div
                 key={msg.id}
                 className={`rounded-lg px-4 py-3 text-sm ${
                   msg.role === 'user'
-                    ? 'bg-[#a78bfa]/10 border border-[#a78bfa]/20 ml-8'
-                    : 'bg-[#27272a] mr-8'
+                    ? 'bg-violet-500/5 border border-violet-500/10 ml-12'
+                    : 'bg-[#141416] border border-[#1a1a1e] mr-12'
                 }`}
               >
                 <div className="flex items-center gap-2 mb-1">
-                  <span className={`text-xs font-medium ${
-                    msg.role === 'user' ? 'text-[#a78bfa]' : 'text-green-400'
+                  <span className={`text-[11px] font-medium ${
+                    msg.role === 'user' ? 'text-violet-400' : 'text-green-400'
                   }`}>
-                    {msg.role === 'user' ? 'User' : 'Assistant'}
+                    {msg.role === 'user' ? 'User' : 'AI'}
                   </span>
-                  <span className="text-xs text-zinc-600">
-                    {new Date(msg.created_at).toLocaleString()}
+                  {msg.model && (
+                    <span className="text-[10px] text-zinc-600 px-1.5 py-0.5 bg-[#1a1a1e] rounded">
+                      {msg.model}
+                    </span>
+                  )}
+                  <span className="text-[10px] text-zinc-700">
+                    {new Date(msg.created_at).toLocaleTimeString()}
                   </span>
                 </div>
                 <p className="text-zinc-300 whitespace-pre-wrap">{msg.content}</p>
@@ -84,46 +102,68 @@ export default function ConversationsPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-white">Conversations</h1>
-        <button
-          onClick={fetchConversations}
-          className="px-3 py-1.5 bg-[#27272a] hover:bg-[#3f3f46] rounded-lg text-xs text-zinc-400 hover:text-white transition-colors"
-        >
-          ↻ Refresh
-        </button>
+        <div>
+          <h1 className="text-2xl font-bold text-white tracking-tight">Conversations</h1>
+          <p className="text-sm text-zinc-500 mt-0.5">{conversations.length} total conversations</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <input
+            type="text"
+            placeholder="Search title or user..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="bg-[#141416] border border-[#1a1a1e] rounded-lg px-3 py-1.5 text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-violet-500/50 w-48"
+          />
+          <button
+            onClick={fetchConversations}
+            className="px-3 py-1.5 bg-[#141416] hover:bg-[#1a1a1e] border border-[#1a1a1e] rounded-lg text-xs text-zinc-400 hover:text-white transition-all"
+          >
+            ↻ Refresh
+          </button>
+        </div>
       </div>
 
       {loading ? (
-        <div className="text-zinc-400">Loading...</div>
+        <div className="space-y-2">
+          {[1,2,3,4,5].map(i => (
+            <div key={i} className="h-14 bg-[#0a0a0b] border border-[#1a1a1e] rounded-xl animate-pulse" />
+          ))}
+        </div>
       ) : (
-        <div className="bg-[#18181b] border border-[#27272a] rounded-xl overflow-hidden">
+        <div className="bg-[#0a0a0b] border border-[#1a1a1e] rounded-xl overflow-hidden">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-[#27272a]">
-                <th className="text-left px-4 py-3 text-sm text-zinc-400 font-medium">User</th>
-                <th className="text-left px-4 py-3 text-sm text-zinc-400 font-medium">Title</th>
-                <th className="text-left px-4 py-3 text-sm text-zinc-400 font-medium">Model</th>
-                <th className="text-left px-4 py-3 text-sm text-zinc-400 font-medium">Last Active</th>
+              <tr className="border-b border-[#1a1a1e]">
+                <th className="text-left px-4 py-3 text-[11px] text-zinc-500 font-medium uppercase tracking-wider">User</th>
+                <th className="text-left px-4 py-3 text-[11px] text-zinc-500 font-medium uppercase tracking-wider">Title</th>
+                <th className="text-left px-4 py-3 text-[11px] text-zinc-500 font-medium uppercase tracking-wider">Model</th>
+                <th className="text-left px-4 py-3 text-[11px] text-zinc-500 font-medium uppercase tracking-wider">Updated</th>
               </tr>
             </thead>
             <tbody>
-              {conversations.map((convo) => (
+              {filtered.map((convo) => (
                 <tr
                   key={convo.id}
                   onClick={() => openConversation(convo)}
-                  className="border-b border-[#27272a] hover:bg-[#27272a] transition-colors cursor-pointer"
+                  className="border-b border-[#1a1a1e] hover:bg-[#141416] transition-colors cursor-pointer"
                 >
-                  <td className="px-4 py-3 text-sm text-zinc-400">{convo.profiles?.name || 'Unknown'}</td>
-                  <td className="px-4 py-3 text-sm text-white">{convo.title}</td>
-                  <td className="px-4 py-3 text-sm text-zinc-400">{convo.model}</td>
-                  <td className="px-4 py-3 text-sm text-zinc-400">
+                  <td className="px-4 py-3 text-xs text-zinc-500 font-mono">{convo.user_id?.slice(0, 12)}...</td>
+                  <td className="px-4 py-3 text-sm text-white">{convo.title || 'Untitled'}</td>
+                  <td className="px-4 py-3">
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#1a1a1e] text-zinc-500">
+                      {convo.model}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-sm text-zinc-500">
                     {new Date(convo.updated_at).toLocaleDateString()}
                   </td>
                 </tr>
               ))}
-              {conversations.length === 0 && (
+              {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="px-4 py-8 text-center text-zinc-500 text-sm">No conversations found</td>
+                  <td colSpan={4} className="px-4 py-12 text-center text-zinc-600 text-sm">
+                    {search ? 'No matching conversations' : 'No conversations yet'}
+                  </td>
                 </tr>
               )}
             </tbody>
