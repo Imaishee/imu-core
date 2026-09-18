@@ -26,6 +26,9 @@ build/
 out/
 .vercel
 
+# Screenshots
+screenshot-*.png
+
 # Build
 dist/
 build/
