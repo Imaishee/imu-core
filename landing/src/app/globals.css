@@ -34,58 +34,6 @@ body {
   color: #1F2A24;
 }
 
-/* ── Cute Dotted + Hearts Background ── */
-.cute-pattern-bg {
-  position: relative;
-  background-color: var(--bg);
-}
-
-.cute-pattern-bg::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background-image:
-    radial-gradient(circle, rgba(45, 106, 79, 0.08) 1px, transparent 1px);
-  background-size: 28px 28px;
-  pointer-events: none;
-  z-index: 0;
-}
-
-.cute-pattern-bg::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background-image:
-    radial-gradient(circle, rgba(45, 106, 79, 0.06) 1.5px, transparent 1.5px);
-  background-size: 56px 56px;
-  background-position: 14px 14px;
-  pointer-events: none;
-  z-index: 0;
-}
-
-/* ── Floating Sparkles ── */
-@keyframes sparkle-float {
-  0%, 100% { transform: translateY(0px) scale(1); opacity: 0.15; }
-  25% { opacity: 0.35; }
-  50% { transform: translateY(-12px) scale(1.2); opacity: 0.25; }
-  75% { opacity: 0.3; }
-}
-
-.sparkle {
-  position: absolute;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(45, 106, 79, 0.4), rgba(45, 106, 79, 0));
-  pointer-events: none;
-  z-index: 0;
-}
-
-.sparkle-1 { width: 6px; height: 6px; top: 15%; left: 20%; animation: sparkle-float 4s ease-in-out infinite 0s; }
-.sparkle-2 { width: 4px; height: 4px; top: 30%; left: 75%; animation: sparkle-float 5s ease-in-out infinite 1s; }
-.sparkle-3 { width: 8px; height: 8px; top: 60%; left: 35%; animation: sparkle-float 6s ease-in-out infinite 2s; }
-.sparkle-4 { width: 5px; height: 5px; top: 45%; left: 85%; animation: sparkle-float 4.5s ease-in-out infinite 0.5s; }
-.sparkle-5 { width: 7px; height: 7px; top: 75%; left: 55%; animation: sparkle-float 5.5s ease-in-out infinite 1.5s; }
-.sparkle-6 { width: 4px; height: 4px; top: 20%; left: 50%; animation: sparkle-float 4s ease-in-out infinite 3s; }
-
 /* ── Glass Card (Light) ── */
 .glass-card {
   background: rgba(255, 255, 255, 0.6);
@@ -106,15 +54,6 @@ body {
     inset 0 1px 0 rgba(255, 255, 255, 1);
   transform: translateY(-2px);
 }
-
-/* ── Hero Logo Bounce ── */
-@keyframes logo-bounce {
-  0%, 100% { transform: translateY(0) rotate(0deg); }
-  25% { transform: translateY(-6px) rotate(-2deg); }
-  75% { transform: translateY(-3px) rotate(1deg); }
-}
-
-.logo-bounce { animation: logo-bounce 3s ease-in-out infinite; }
 
 /* ── Cute Bounce Press ── */
 @keyframes cute-press {
@@ -163,8 +102,33 @@ body {
   position: absolute;
   left: 0;
   right: 0;
-  animation: text-rotate-in 2.4s ease-in-out forwards;
+  animation: text-rotate-in 2.6s ease-in-out forwards;
   opacity: 0;
+}
+
+/* ── Typing cursor ── */
+@keyframes cursor-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.typing-cursor {
+  display: inline-block;
+  color: #2D6A4F;
+  font-weight: 300;
+  animation: cursor-blink 0.8s ease-in-out infinite;
+  margin-left: 1px;
+}
+
+/* ── Typing dots ── */
+@keyframes typing-bounce {
+  0%, 60%, 100% { transform: translateY(0); }
+  30% { transform: translateY(-6px); }
+}
+
+.typing-dot {
+  animation: typing-bounce 1.4s ease-in-out infinite;
+  display: inline-block;
 }
 
 /* ── Gradient text ── */
