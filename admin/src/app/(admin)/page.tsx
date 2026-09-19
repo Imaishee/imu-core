@@ -11,7 +11,7 @@ interface DashboardStats {
 }
 
 interface HealthStatus {
-  engine: { status: string; url: string; engine?: any };
+  engine: { status: string; url: string; engine?: any; note?: string };
   database: { status: string; error?: string };
   hfSpace: { status: string; url: string; error?: string };
 }
@@ -88,9 +88,9 @@ export default function DashboardPage() {
           />
           <div className="flex-1" />
           <div className="text-right">
-            <p className="text-[11px] text-zinc-600">Engine URL</p>
+            <p className="text-[11px] text-zinc-600">Engine</p>
             <p className="text-xs text-zinc-400 font-mono truncate max-w-[200px]">
-              {health?.engine?.url || 'Checking...'}
+              {health?.engine?.note || health?.engine?.url || 'Checking...'}
             </p>
           </div>
         </div>
@@ -153,6 +153,7 @@ function HealthIndicator({ label, status }: { label: string; status: string }) {
     ok: 'bg-green-500',
     offline: 'bg-red-500',
     error: 'bg-red-500',
+    sleeping: 'bg-yellow-500 animate-pulse',
     loading: 'bg-yellow-500 animate-pulse',
     unknown: 'bg-zinc-600',
   };

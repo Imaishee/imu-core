@@ -206,20 +206,6 @@ class _ImuAppState extends State<ImuApp> {
         _forceUpdate = resp.data['force_update'] ?? false;
 
         if (mounted) setState(() {});
-
-        // Auto-start background download immediately (non-blocking)
-        if (_updateUrl != null && _updateUrl!.isNotEmpty) {
-          final info = UpdateInfo(
-            updateAvailable: true,
-            latestVersion: _latestVersion ?? '',
-            currentVersion: AppConstants.appVersion,
-            downloadUrl: _updateUrl!,
-            releaseNotes: _updateNotes ?? '',
-            forceUpdate: _forceUpdate,
-          );
-          // Fire-and-forget: download runs in background, notification shows progress
-          UpdateService().downloadAndInstall(info);
-        }
       }
     } catch (_) {}
   }
@@ -286,7 +272,7 @@ class _ImuAppState extends State<ImuApp> {
       // `home` (not `initialRoute`) is required: Flutter's initial-route
       // generation walks the '/' prefix and throws a null-check error when
       // no '/' route exists, which white-screens the app on launch.
-      home: _forceUpdate && _updateUrl != null && _updateUrl!.isNotEmpty
+      home: _latestVersion != null && _updateUrl != null && _updateUrl!.isNotEmpty
           ? UpdateScreen(
               updateInfo: UpdateInfo(
                 updateAvailable: true,
@@ -294,7 +280,7 @@ class _ImuAppState extends State<ImuApp> {
                 currentVersion: AppConstants.appVersion,
                 downloadUrl: _updateUrl!,
                 releaseNotes: _updateNotes ?? '',
-                forceUpdate: true,
+                forceUpdate: _forceUpdate,
               ),
             )
           : deepLinkHome != null

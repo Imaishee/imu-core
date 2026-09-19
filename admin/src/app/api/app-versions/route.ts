@@ -1,9 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabase } from '@/lib/supabase';
-import { writeFile, unlink, mkdir } from 'fs/promises';
-import { existsSync } from 'fs';
-import path from 'path';
-import { randomUUID } from 'crypto';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,72 +17,35 @@ export async function GET() {
   return NextResponse.json({ versions: data });
 }
 
-// POST: Create new version (with APK upload)
+// POST: Create new version (metadata only — APK uploaded directly to storage from client)
 export async function POST(req: NextRequest) {
   try {
-    const formData = await req.formData();
-    const version = formData.get('version') as string;
-    const releaseNotes = formData.get('release_notes') as string || '';
-    const forceUpdate = formData.get('force_update') === 'true';
-    const apkFile = formData.get('apk') as File | null;
+    const body = await req.json();
+    const { version, release_notes, force_update, download_url, file_size } = body;
 
     if (!version) {
       return NextResponse.json({ error: 'Version is required' }, { status: 400 });
     }
+    if (!download_url) {
+      return NextResponse.json({ error: 'Download URL is required' }, { status: 400 });
+    }
 
     const supabase = getSupabase();
-
-    // Upload APK to Supabase Storage if provided
-    let downloadUrl = formData.get('download_url') as string || '';
-
-    if (apkFile && apkFile.size > 0) {
-      const fileName = `imu_v${version}.apk`;
-      const filePath = `apks/${fileName}`;
-
-      // Convert File to Buffer
-      const arrayBuffer = await apkFile.arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer);
-
-      // Upload to Supabase Storage
-      const { error: uploadError } = await supabase.storage
-        .from('apk-downloads')
-        .upload(filePath, buffer, {
-          contentType: 'application/vnd.android.package-archive',
-          upsert: true,
-        });
-
-      if (uploadError) {
-        console.error('[AppVersions] Upload error:', uploadError);
-        return NextResponse.json({ error: `Upload failed: ${uploadError.message}` }, { status: 500 });
-      }
-
-      // Get public URL
-      const { data: urlData } = supabase.storage
-        .from('apk-downloads')
-        .getPublicUrl(filePath);
-
-      downloadUrl = urlData.publicUrl;
-    }
-
-    if (!downloadUrl) {
-      return NextResponse.json({ error: 'Either an APK file or download URL is required' }, { status: 400 });
-    }
 
     // Insert version record
     const { data, error: insertError } = await supabase
       .from('app_versions')
       .insert({
         version,
-        download_url: downloadUrl,
-        release_notes: releaseNotes,
-        force_update: forceUpdate,
-        file_size: apkFile?.size || 0,
+        download_url,
+        release_notes: release_notes || '',
+        force_update: force_update || false,
+        file_size: file_size || 0,
       })
       .select()
       .single();
 
     if (insertError) {
-      // If unique constraint violation, the version already exists
       if (insertError.code === '23505') {
         return NextResponse.json({ error: `Version ${version} already exists` }, { status: 409 });
       }
@@ -125,8 +84,14 @@ export async function DELETE(req: NextRequest) {
 
     // Delete from storage if it's a Supabase-hosted file
     if (version.download_url.includes('apk-downloads')) {
-      const fileName = `apks/imu_v${version.version}.apk`;
-      await supabase.storage.from('apk-downloads').remove([fileName]);
+      // Try both naming patterns
+      const patterns = [
+        `apks/imu_v${version.version}.apk`,
+        `IMU-v${version.version}-arm64.apk`,
+      ];
+      for (const pattern of patterns) {
+        await supabase.storage.from('apk-downloads').remove([pattern]).catch(() => {});
+      }
     }
 
     // Delete the record

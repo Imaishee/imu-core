@@ -14,7 +14,7 @@ export async function POST(request: Request) {
 
   const supabase = getSupabase();
 
-  // Insert notification using correct column name 'message' not 'body'
+  // Insert notification
   const { data: notification, error: insertError } = await supabase
     .from('notifications')
     .insert({
@@ -34,7 +34,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: insertError.message }, { status: 500 });
   }
 
-  // Try to trigger FCM push via Edge Function (non-blocking)
+  // Trigger FCM push via Edge Function (non-blocking)
   try {
     const edgeFunctionUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/notify`;
     await fetch(edgeFunctionUrl, {
@@ -49,14 +49,6 @@ export async function POST(request: Request) {
   } catch (e) {
     console.log('Edge Function notify skipped:', e);
   }
-
-  // Log activity
-  await supabase.from('activity_log').insert({
-    action: 'notification_sent',
-    target_type: 'notification',
-    target_id: notification?.id,
-    metadata: { title, target },
-  });
 
   return NextResponse.json({ notification });
 }

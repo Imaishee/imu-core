@@ -67,3 +67,6 @@ dist/
 
 # Vercel
 .vercel/
+
+# ECC (installed to ~/.config/opencode/ separately)
+ECC/

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 
 interface HealthData {
-  engine: { status: string; url: string; engine?: any; error?: string };
+  engine: { status: string; url: string; engine?: any; error?: string; note?: string };
   database: { status: string; error?: string };
   hfSpace: { status: string; url: string; error?: string; latency?: string };
   timestamp: string;
@@ -15,7 +15,7 @@ export default function HealthPage() {
 
   useEffect(() => {
     fetchHealth();
-    const interval = setInterval(fetchHealth, 10000);
+    const interval = setInterval(fetchHealth, 15000);
     return () => clearInterval(interval);
   }, []);
 
@@ -67,7 +67,7 @@ export default function HealthPage() {
               name="IMU Heart Engine"
               status={health?.engine?.status || 'unknown'}
               error={health?.engine?.error}
-              details={health?.engine?.url || ''}
+              details={health?.engine?.note || health?.engine?.url || ''}
             />
             <ServiceCard
               name="HF Space (IMU Heart)"
@@ -104,22 +104,24 @@ function ServiceCard({ name, status, error, details }: {
 }) {
   const isOk = status === 'online' || status === 'ok';
   const isOff = status === 'offline' || status === 'error';
+  const isSleeping = status === 'sleeping';
 
   return (
     <div className={`bg-[#0a0a0b] border rounded-xl p-5 ${
-      isOk ? 'border-green-500/20' : isOff ? 'border-red-500/20' : 'border-[#1a1a1e]'
+      isOk ? 'border-green-500/20' : isOff ? 'border-red-500/20' : isSleeping ? 'border-yellow-500/20' : 'border-[#1a1a1e]'
     }`}>
       <div className="flex items-center gap-3 mb-3">
         <div className={`w-3 h-3 rounded-full ${
           isOk ? 'bg-green-500 shadow-lg shadow-green-500/50' :
           isOff ? 'bg-red-500 shadow-lg shadow-red-500/50' :
-          'bg-yellow-500 animate-pulse'
+          isSleeping ? 'bg-yellow-500 shadow-lg shadow-yellow-500/50 animate-pulse' :
+          'bg-zinc-500 animate-pulse'
         }`} />
         <h3 className="text-sm font-semibold text-white">{name}</h3>
       </div>
       <div className="space-y-1">
         <p className={`text-xs font-medium capitalize ${
-          isOk ? 'text-green-400' : isOff ? 'text-red-400' : 'text-yellow-400'
+          isOk ? 'text-green-400' : isOff ? 'text-red-400' : isSleeping ? 'text-yellow-400' : 'text-zinc-400'
         }`}>
           {status}
         </p>

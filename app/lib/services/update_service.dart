@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:open_file/open_file.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../constants/app_constants.dart';
 
 class UpdateInfo {
@@ -37,8 +38,11 @@ class UpdateInfo {
   }
 }
 
-/// Background update service: downloads APK with progress shown in the
-/// notification tray, then prompts the user to install automatically.
+/// Callback type for download progress updates.
+typedef DownloadProgressCallback = void Function(
+    int received, int total, double speedBytesPerSec);
+
+/// Background update service: downloads APK with progress, then opens installer.
 class UpdateService {
   final String _baseUrl = AppConstants.supabaseUrl;
   final String _anonKey = AppConstants.supabaseAnonKey;
@@ -49,6 +53,8 @@ class UpdateService {
   static const _channelName = 'App Updates';
   static const _channelDesc = 'Shows download progress for app updates';
   static const _notificationId = 9999;
+  static const _prefsKeyDownloadedVersion = 'downloaded_apk_version';
+  static const _prefsKeyDownloadedPath = 'downloaded_apk_path';
 
   static bool _downloading = false;
   bool get isDownloading => _downloading;
@@ -77,6 +83,30 @@ class UpdateService {
     return null;
   }
 
+  /// Check if we already have a downloaded APK for the given version.
+  Future<bool> isAlreadyDownloaded(String version) async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedVersion = prefs.getString(_prefsKeyDownloadedVersion);
+    final savedPath = prefs.getString(_prefsKeyDownloadedPath);
+    if (savedVersion == version && savedPath != null) {
+      final file = File(savedPath);
+      if (await file.exists()) return true;
+    }
+    return false;
+  }
+
+  /// Get the path to a previously downloaded APK, or null.
+  Future<String?> getDownloadedApkPath(String version) async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedVersion = prefs.getString(_prefsKeyDownloadedVersion);
+    final savedPath = prefs.getString(_prefsKeyDownloadedPath);
+    if (savedVersion == version && savedPath != null) {
+      final file = File(savedPath);
+      if (await file.exists()) return savedPath;
+    }
+    return null;
+  }
+
   /// Ensure the notification channel for download progress exists.
   Future<void> _ensureChannel() async {
     final androidImpl = _notifications.resolvePlatformSpecificImplementation<
@@ -94,14 +124,25 @@ class UpdateService {
     );
   }
 
-  /// Download the APK in the background with notification progress.
-  /// On completion, automatically opens the APK for installation.
-  Future<void> downloadAndInstall(UpdateInfo info) async {
-    if (_downloading || info.downloadUrl.isEmpty) return;
+  /// Download APK to a persistent location. Returns the file path.
+  /// Skips download if already have this version.
+  Future<String?> downloadApk(
+    UpdateInfo info, {
+    DownloadProgressCallback? onProgress,
+  }) async {
+    if (_downloading || info.downloadUrl.isEmpty) return null;
     _downloading = true;
 
     try {
       await _ensureChannel();
+
+      // Check if already downloaded
+      final existing = await getDownloadedApkPath(info.latestVersion);
+      if (existing != null) {
+        print('[UpdateService] APK already downloaded: $existing');
+        _downloading = false;
+        return existing;
+      }
 
       // Show initial "starting" notification
       await _notifications.show(
@@ -126,12 +167,15 @@ class UpdateService {
         ),
       );
 
-      // Get temporary directory for the APK
-      final dir = await getTemporaryDirectory();
+      // Use Documents directory (persistent, survives cache clearing)
+      final dir = await getApplicationDocumentsDirectory();
       final apkPath = '${dir.path}/imu_v${info.latestVersion}.apk';
       final file = File(apkPath);
 
-      // Download with progress tracking using HttpClient (supports content-length)
+      // Delete old file if exists
+      if (await file.exists()) await file.delete();
+
+      // Download with progress tracking
       final uri = Uri.parse(info.downloadUrl);
       final request = await HttpClient().getUrl(uri);
       final response = await request.close();
@@ -139,12 +183,13 @@ class UpdateService {
       if (response.statusCode != 200) {
         print('[UpdateService] Download failed: HTTP ${response.statusCode}');
         _downloading = false;
-        return;
+        return null;
       }
 
       final contentLength = response.contentLength ?? 0;
       int received = 0;
       final sink = file.openWrite();
+      final stopwatch = Stopwatch()..start();
 
       await for (final chunk in response) {
         sink.add(chunk);
@@ -152,8 +197,12 @@ class UpdateService {
 
         if (contentLength > 0) {
           final progress = ((received / contentLength) * 100).toInt();
+          final elapsedSec = stopwatch.elapsedMilliseconds / 1000.0;
+          final speed = elapsedSec > 0 ? received / elapsedSec : 0.0;
 
-          // Update notification every 2% to avoid flooding
+          onProgress?.call(received, contentLength, speed);
+
+          // Update notification every 2%
           if (progress % 2 == 0 || progress == 100) {
             final mbDone = (received / 1048576).toStringAsFixed(1);
             final mbTotal = (contentLength / 1048576).toStringAsFixed(1);
@@ -183,12 +232,18 @@ class UpdateService {
       }
 
       await sink.close();
+      stopwatch.stop();
 
-      // Show "installing" notification
+      // Save downloaded version to prefs
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_prefsKeyDownloadedVersion, info.latestVersion);
+      await prefs.setString(_prefsKeyDownloadedPath, apkPath);
+
+      // Show "ready to install" notification
       await _notifications.show(
         _notificationId,
-        'Download complete',
-        'Tap to install v${info.latestVersion}',
+        'Download complete — v${info.latestVersion}',
+        'Tap to install',
         NotificationDetails(
           android: AndroidNotificationDetails(
             _channelId,
@@ -204,16 +259,14 @@ class UpdateService {
         ),
       );
 
-      // Auto-open the APK for installation
-      final result = await OpenFile.open(apkPath, type: 'application/vnd.android.package-archive');
-      print('[UpdateService] Open file result: ${result.message}');
+      print('[UpdateService] Download complete: $apkPath');
+      return apkPath;
     } catch (e) {
-      print('[UpdateService] Download/install error: $e');
-      // Show error notification
+      print('[UpdateService] Download error: $e');
       await _notifications.show(
         _notificationId,
-        'Update failed',
-        'Could not download the update. Tap to retry.',
+        'Download failed',
+        'Could not download update. Please try again.',
         NotificationDetails(
           android: AndroidNotificationDetails(
             _channelId,
@@ -224,8 +277,39 @@ class UpdateService {
           ),
         ),
       );
+      return null;
     } finally {
       _downloading = false;
     }
+  }
+
+  /// Open the APK file to trigger Android's package installer.
+  static Future<bool> installApk(String apkPath) async {
+    try {
+      final file = File(apkPath);
+      if (!await file.exists()) return false;
+
+      final result = await OpenFile.open(
+        apkPath,
+        type: 'application/vnd.android.package-archive',
+      );
+      print('[UpdateService] Install open result: ${result.message}');
+      return true;
+    } catch (e) {
+      print('[UpdateService] Install error: $e');
+      return false;
+    }
+  }
+
+  /// Clear saved download info (e.g. after successful install).
+  static Future<void> clearDownloadedApk() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedPath = prefs.getString(_prefsKeyDownloadedPath);
+    if (savedPath != null) {
+      final file = File(savedPath);
+      if (await file.exists()) await file.delete();
+    }
+    await prefs.remove(_prefsKeyDownloadedVersion);
+    await prefs.remove(_prefsKeyDownloadedPath);
   }
 }

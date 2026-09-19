@@ -31,7 +31,7 @@ export async function GET() {
 
   const [engine, dbCheck, hfSpace] = await Promise.all([
     getEngineHealth(),
-    supabase.from('conversations').select('id', { count: 'exact', head: true }).then(
+    supabase.from('profiles').select('id', { count: 'exact', head: true }).then(
       r => ({ status: r.error ? 'error' : 'ok', error: r.error?.message }),
       e => ({ status: 'error', error: e.message })
     ),

@@ -32,6 +32,7 @@ export default function ConversationsPage() {
 
   const filtered = conversations.filter(c =>
     c.title?.toLowerCase().includes(search.toLowerCase()) ||
+    c.user_name?.toLowerCase().includes(search.toLowerCase()) ||
     c.user_id?.toLowerCase().includes(search.toLowerCase())
   );
 
@@ -48,7 +49,7 @@ export default function ConversationsPage() {
           <div>
             <h1 className="text-lg font-bold text-white">{selected.title || 'Untitled'}</h1>
             <p className="text-xs text-zinc-500 font-mono">
-              {selected.user_id?.slice(0, 12)}... · {selected.model} · {new Date(selected.created_at).toLocaleDateString()}
+              {selected.user_name || selected.user_id?.slice(0, 12)} · {selected.model} · {new Date(selected.created_at).toLocaleDateString()}
             </p>
           </div>
         </div>
@@ -64,11 +65,12 @@ export default function ConversationsPage() {
             <div className="text-center py-12">
               <span className="text-3xl">💬</span>
               <p className="text-sm text-zinc-600 mt-3">No messages in this conversation</p>
+              <p className="text-[11px] text-zinc-700 mt-1">Messages may be stored in conversation payload</p>
             </div>
           ) : (
-            messages.map((msg: any) => (
+            messages.map((msg: any, idx: number) => (
               <div
-                key={msg.id}
+                key={msg.id || idx}
                 className={`rounded-lg px-4 py-3 text-sm ${
                   msg.role === 'user'
                     ? 'bg-violet-500/5 border border-violet-500/10 ml-12'
@@ -87,10 +89,10 @@ export default function ConversationsPage() {
                     </span>
                   )}
                   <span className="text-[10px] text-zinc-700">
-                    {new Date(msg.created_at).toLocaleTimeString()}
+                    {new Date(msg.created_at || msg.timestamp || Date.now()).toLocaleTimeString()}
                   </span>
                 </div>
-                <p className="text-zinc-300 whitespace-pre-wrap">{msg.content}</p>
+                <p className="text-zinc-300 whitespace-pre-wrap">{msg.content || msg.text || JSON.stringify(msg)}</p>
               </div>
             ))
           )}
@@ -147,7 +149,14 @@ export default function ConversationsPage() {
                   onClick={() => openConversation(convo)}
                   className="border-b border-[#1a1a1e] hover:bg-[#141416] transition-colors cursor-pointer"
                 >
-                  <td className="px-4 py-3 text-xs text-zinc-500 font-mono">{convo.user_id?.slice(0, 12)}...</td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-full bg-violet-500/20 flex items-center justify-center text-[10px] font-bold text-violet-400">
+                        {(convo.user_name || '?')[0]?.toUpperCase()}
+                      </div>
+                      <span className="text-xs text-zinc-400">{convo.user_name || convo.user_id?.slice(0, 12)}</span>
+                    </div>
+                  </td>
                   <td className="px-4 py-3 text-sm text-white">{convo.title || 'Untitled'}</td>
                   <td className="px-4 py-3">
                     <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#1a1a1e] text-zinc-500">
