@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
 
       // Upload to Supabase Storage
       const { error: uploadError } = await supabase.storage
-        .from('app-uploads')
+        .from('apk-downloads')
         .upload(filePath, buffer, {
           contentType: 'application/vnd.android.package-archive',
           upsert: true,
@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
 
       // Get public URL
       const { data: urlData } = supabase.storage
-        .from('app-uploads')
+        .from('apk-downloads')
         .getPublicUrl(filePath);
 
       downloadUrl = urlData.publicUrl;
@@ -124,9 +124,9 @@ export async function DELETE(req: NextRequest) {
     }
 
     // Delete from storage if it's a Supabase-hosted file
-    if (version.download_url.includes('app-uploads')) {
+    if (version.download_url.includes('apk-downloads')) {
       const fileName = `apks/imu_v${version.version}.apk`;
-      await supabase.storage.from('app-uploads').remove([fileName]);
+      await supabase.storage.from('apk-downloads').remove([fileName]);
     }
 
     // Delete the record
