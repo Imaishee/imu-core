@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:open_file/open_file.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -283,11 +284,48 @@ class UpdateService {
     }
   }
 
+  static const _channel = MethodChannel('com.imu/install');
+
+  /// Check if the user has granted "Install unknown apps" permission.
+  static Future<bool> canInstall() async {
+    if (!Platform.isAndroid) return true;
+    try {
+      final result = await _channel.invokeMethod<bool>('canRequestPackageInstalls');
+      return result ?? false;
+    } catch (_) {
+      // Method channel not available — assume blocked
+      return false;
+    }
+  }
+
+  /// Open system settings so user can enable "Install unknown apps" for I'MU.
+  static Future<void> openInstallSettings() async {
+    if (!Platform.isAndroid) return;
+    try {
+      await _channel.invokeMethod('openInstallSettings');
+    } catch (_) {
+      // Fallback: try opening app settings directly
+      try {
+        await _channel.invokeMethod('openAppSettings');
+      } catch (_) {}
+    }
+  }
+
   /// Open the APK file to trigger Android's package installer.
   static Future<bool> installApk(String apkPath) async {
     try {
       final file = File(apkPath);
       if (!await file.exists()) return false;
+
+      // On Android 8+ check if install permission is granted
+      if (Platform.isAndroid) {
+        final allowed = await canInstall();
+        if (!allowed) {
+          print('[UpdateService] Install permission not granted — opening settings');
+          await openInstallSettings();
+          return false;
+        }
+      }
 
       final result = await OpenFile.open(
         apkPath,

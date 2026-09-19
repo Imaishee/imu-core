@@ -318,11 +318,16 @@ class MessagesNotifier extends Notifier<List<ChatMessage>> {
         }
       } else {
         // Regular chat flow for non-companion conversations
+        // Look up the Supabase UUID for this conversation to pass to the edge function
+        final convoForEdge = ref
+            .read(conversationsProvider)
+            .where((c) => c.remoteId == _conversationId)
+            .firstOrNull;
         await for (final event in ref
             .read(chatServiceProvider)
             .streamChat(
               messages: apiMessages,
-              conversationId: _conversationId,
+              conversationId: convoForEdge?.supabaseId,
               context: chatContext.isNotEmpty ? chatContext : null,
               model: selectedModel,
             )) {

@@ -89,6 +89,25 @@ class _UpdateScreenState extends State<UpdateScreen> {
   Future<void> _installApk() async {
     setState(() {
       _phase = _Phase.installing;
+      _statusText = 'Checking install permission...';
+    });
+
+    // Check permission first — if not granted, settings will open
+    final allowed = await UpdateService.canInstall();
+    if (!mounted) return;
+
+    if (!allowed) {
+      // Settings screen opened automatically — wait for user to return
+      setState(() {
+        _phase = _Phase.downloaded;
+        _statusText = 'Please enable "Install unknown apps" for I\'MU, then tap Install again.';
+      });
+      // Open settings for the user
+      await UpdateService.openInstallSettings();
+      return;
+    }
+
+    setState(() {
       _statusText = 'Opening installer...';
     });
 
@@ -103,7 +122,7 @@ class _UpdateScreenState extends State<UpdateScreen> {
     } else {
       setState(() {
         _phase = _Phase.error;
-        _errorText = 'Could not open installer. The file may be corrupted — try downloading again.';
+        _errorText = 'Could not open installer. Please try downloading again.';
       });
     }
   }
