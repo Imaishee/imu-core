@@ -10,6 +10,7 @@ const links = [
   { href: '/ai-messages', label: 'AI Messages', icon: '🤖' },
   { href: '/notifications', label: 'Notifications', icon: '🔔' },
   { href: '/friends', label: 'Friends', icon: '🫂' },
+  { href: '/updates', label: 'App Updates', icon: '📦' },
   { href: '/health', label: 'System Health', icon: '💓' },
 ];
 
@@ -56,7 +57,7 @@ export default function Sidebar() {
             <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
             <span>System Online</span>
           </div>
-          <div>IMU v2.0.0</div>
+          <div>IMU v1.6.2</div>
         </div>
       </div>
     </aside>

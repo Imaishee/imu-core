@@ -207,7 +207,7 @@ export async function getAIMessages(limit = 100) {
   const supabase = getClient();
   const { data, error } = await supabase
     .from('ai_messages')
-    .select('*')
+    .select('*, profiles!ai_messages_user_id_fkey(id, name)')
     .order('created_at', { ascending: false })
     .limit(limit);
   return { data: data || [], error };
@@ -219,7 +219,11 @@ export async function getFriends() {
   const supabase = getClient();
   const { data, error } = await supabase
     .from('friends')
-    .select('*')
+    .select(`
+      *,
+      user_profile:profiles!friends_user_id_fkey(id, name),
+      friend_profile:profiles!friends_friend_id_fkey(id, name)
+    `)
     .order('created_at', { ascending: false });
   return { data: data || [], error };
 }

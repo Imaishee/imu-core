@@ -96,6 +96,49 @@ function supabaseHeaders(svcKey: string) {
   };
 }
 
+// Send FCM push notification to a user's registered devices
+async function sendFCMNotification(
+  supabaseUrl: string,
+  headers: Record<string, string>,
+  userId: string,
+  title: string,
+  body: string,
+): Promise<boolean> {
+  try {
+    // Get user's FCM tokens
+    const tokensResp = await fetch(
+      `${supabaseUrl}/rest/v1/fcm_tokens?user_id=eq.${userId}&select=token`,
+      { headers }
+    );
+    if (!tokensResp.ok) return false;
+
+    const tokens = await tokensResp.json();
+    if (!tokens || tokens.length === 0) return false;
+
+    // Send to each token via the notify edge function
+    for (const t of tokens) {
+      try {
+        await fetch(`${supabaseUrl}/functions/v1/notify`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": headers["Authorization"],
+            "apikey": headers["apikey"],
+          },
+          body: JSON.stringify({
+            token: t.token,
+            title,
+            body,
+          }),
+        });
+      } catch (_) {}
+    }
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -108,9 +151,9 @@ Deno.serve(async (req) => {
 
     const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
-    // Get active users via REST
+    // Get active users via REST — only those visible and with last_active_at
     const usersResp = await fetch(
-      `${supabaseUrl}/rest/v1/profiles?id=not.is.null&last_active_at=gte.${cutoff}&select=id,companion_gender`,
+      `${supabaseUrl}/rest/v1/profiles?id=not.is.null&last_active_at=gte.${cutoff}&is_visible=eq.true&select=id,companion_gender,name`,
       { headers }
     );
 
@@ -131,6 +174,7 @@ Deno.serve(async (req) => {
         const gender = user.companion_gender || "female";
         const message = getProactiveMessage(timePeriod, gender);
 
+        // Insert into ai_messages table
         const insertResp = await fetch(`${supabaseUrl}/rest/v1/ai_messages`, {
           method: "POST",
           headers,
@@ -141,6 +185,11 @@ Deno.serve(async (req) => {
             created_at: new Date().toISOString(),
           }),
         });
+
+        // Also send push notification (non-blocking)
+        const pushTitle = gender === "male" ? "I'MU 💚" : "I'MU 💚";
+        sendFCMNotification(supabaseUrl, headers, user.id, pushTitle, message)
+          .catch(() => {});
 
         results.push({ userId: user.id, success: insertResp.ok });
       } catch {

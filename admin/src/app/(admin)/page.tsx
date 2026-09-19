@@ -13,6 +13,7 @@ interface DashboardStats {
 interface HealthStatus {
   engine: { status: string; url: string; engine?: any };
   database: { status: string; error?: string };
+  hfSpace: { status: string; url: string; error?: string };
 }
 
 export default function DashboardPage() {
@@ -78,6 +79,10 @@ export default function DashboardPage() {
             status={health?.engine?.status || (loading ? 'loading' : 'unknown')}
           />
           <HealthIndicator
+            label="HF Space"
+            status={health?.hfSpace?.status || (loading ? 'loading' : 'unknown')}
+          />
+          <HealthIndicator
             label="Groq API"
             status="online"
           />
@@ -131,10 +136,11 @@ export default function DashboardPage() {
       </div>
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <QuickAction href="/notifications" icon="🔔" label="Send Notification" desc="Push to all users" />
         <QuickAction href="/users" icon="👥" label="Manage Users" desc="View & analyze users" />
         <QuickAction href="/conversations" icon="💬" label="Conversations" desc="Browse chat history" />
+        <QuickAction href="/updates" icon="📦" label="App Updates" desc="Upload APK & push updates" />
         <QuickAction href="/health" icon="💓" label="System Health" desc="Engine & DB status" />
       </div>
     </div>

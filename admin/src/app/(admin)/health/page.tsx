@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 interface HealthData {
   engine: { status: string; url: string; engine?: any; error?: string };
   database: { status: string; error?: string };
+  hfSpace: { status: string; url: string; error?: string; latency?: string };
   timestamp: string;
 }
 
@@ -55,7 +56,7 @@ export default function HealthPage() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
             <ServiceCard
               name="Supabase Database"
               status={health?.database?.status || 'unknown'}
@@ -67,6 +68,12 @@ export default function HealthPage() {
               status={health?.engine?.status || 'unknown'}
               error={health?.engine?.error}
               details={health?.engine?.url || ''}
+            />
+            <ServiceCard
+              name="HF Space (IMU Heart)"
+              status={health?.hfSpace?.status || 'unknown'}
+              error={health?.hfSpace?.error}
+              details="shubham1440-imu-heart.hf.space"
             />
             <ServiceCard
               name="Groq API"

@@ -23,6 +23,14 @@ class AppConstants {
   static const String chatEndpoint = '/functions/v1/chat';
   static const String knowledgeEndpoint = '/functions/v1/knowledge';
   static const String checkUpdateEndpoint = '/functions/v1/check-update';
+  static const String aiCompanionEndpoint = '/functions/v1/ai-companion';
+
+  // IMU Heart — HuggingFace Space (Layer 1: seed generation)
+  // The Gradio API returns { "data": ["response", { "intent": ..., "mood": ..., "time": ... }] }
+  static const String imuHeartSpaceUrl = 'https://shubham1440-imu-heart.hf.space/gradio_api/call/chat_fn';
+
+  // Render Engine — fallback Layer 1 (Markov + Groq polish)
+  static const String renderEngineUrl = 'https://imu-heart.onrender.com';
 
   // Firebase
   static const String fcmTopic = 'all_users';

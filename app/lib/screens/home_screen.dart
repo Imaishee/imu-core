@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../providers/chat_provider.dart';
 import '../providers/app_provider.dart';
 import '../constants/app_constants.dart';
 import '../theme/app_theme.dart';
 import '../theme/app_widgets.dart';
+import '../services/update_service.dart';
 import 'chat_screen.dart';
 import 'settings_screen.dart';
 import 'alarms_screen.dart';
@@ -13,6 +13,7 @@ import 'timetable_screen.dart';
 import 'notifications_screen.dart';
 import 'chat_history_screen.dart';
 import 'pomodoro_screen.dart';
+import 'update_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   final VoidCallback? onToggleTheme;
@@ -374,10 +375,21 @@ class _UpdateBanner extends StatelessWidget {
     return GlassCard(
       tint: AppColors.greenPrimary.withAlpha(35),
       onTap: () {
-        final url = updateUrl;
-        if (url != null && url.isNotEmpty) {
-          launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-        }
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => UpdateScreen(
+              updateInfo: UpdateInfo(
+                updateAvailable: true,
+                latestVersion: latestVersion,
+                currentVersion: AppConstants.appVersion,
+                downloadUrl: updateUrl ?? '',
+                releaseNotes: notes ?? '',
+                forceUpdate: forceUpdate,
+              ),
+            ),
+          ),
+        );
       },
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

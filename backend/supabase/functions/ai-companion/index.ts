@@ -94,7 +94,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { message, conversationHistory, companionGender } = await req.json();
+    const { message, conversationHistory, companionGender, imuHeartSeed } = await req.json();
 
     // Validate
     if (!message || typeof message !== "string") {
@@ -120,36 +120,44 @@ Deno.serve(async (req) => {
       { role: "user", content: message },
     ];
 
-    // ─── Layer 1: Try Render IMU Heart Engine first ──────────────────────────
-    const ENGINE_URL = Deno.env.get("ENGINE_URL") || "https://imu-heart.onrender.com";
+    // ─── Layer 1: Use IMU Heart seed if provided by Flutter app ───────────────
+    // The Flutter app calls the HF Space directly and passes the seed here.
+    // This avoids the edge function making a second external call.
     let aiMessage = "Hmm... ki bolbo 😶";
 
-    try {
-      const engineResp = await fetch(`${ENGINE_URL}/generate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message,
-          gender,
-          conversation_history: (conversationHistory || []).slice(-20).map((m: any) => ({
-            role: m.role === "user" ? "user" : "assistant",
-            content: m.content,
-          })),
-        }),
-        signal: AbortSignal.timeout(8000), // 8s timeout for cold starts
-      });
+    if (imuHeartSeed && typeof imuHeartSeed === "string" && imuHeartSeed.trim().length > 0) {
+      aiMessage = imuHeartSeed.trim();
+      console.log("Using IMU Heart seed from Flutter app");
+    } else {
+      // ─── Fallback: Try Render IMU Heart Engine ─────────────────────────────
+      const ENGINE_URL = Deno.env.get("ENGINE_URL") || "https://imu-heart.onrender.com";
+      try {
+        const engineResp = await fetch(`${ENGINE_URL}/generate`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message,
+            gender,
+            conversation_history: (conversationHistory || []).slice(-20).map((m: any) => ({
+              role: m.role === "user" ? "user" : "assistant",
+              content: m.content,
+            })),
+          }),
+          signal: AbortSignal.timeout(8000),
+        });
 
-      if (engineResp.ok) {
-        const engineData = await engineResp.json();
-        if (engineData.response) {
-          aiMessage = engineData.response;
-          console.log("Render engine responded successfully");
+        if (engineResp.ok) {
+          const engineData = await engineResp.json();
+          if (engineData.response) {
+            aiMessage = engineData.response;
+            console.log("Render engine responded successfully");
+          }
+        } else {
+          console.log("Render engine returned", engineResp.status, "- falling back to Groq");
         }
-      } else {
-        console.log("Render engine returned", engineResp.status, "- falling back to Groq");
+      } catch (e) {
+        console.log("Render engine unavailable, falling back to Groq:", e);
       }
-    } catch (e) {
-      console.log("Render engine unavailable, falling back to Groq:", e);
     }
 
     // ─── Layer 2: Fallback to direct Groq if engine failed ───────────────────

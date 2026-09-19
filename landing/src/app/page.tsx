@@ -39,8 +39,13 @@ const rotatingWords = [
 const features = [
   {
     icon: MessageCircle,
-    title: 'Natural Conversation',
-    desc: 'Talk to I\'MU like a friend. It understands context, remembers your preferences, and responds naturally.',
+    title: 'IMU Heart Companion',
+    desc: 'Fine-tuned on real Banglish conversations. Your AI companion speaks your language — not corporate English.',
+  },
+  {
+    icon: Users,
+    title: 'Friends Chat',
+    desc: 'Connect with classmates. Real-time one-on-one chat with read receipts. Find friends by name or email.',
   },
   {
     icon: BookOpen,
@@ -49,23 +54,18 @@ const features = [
   },
   {
     icon: Target,
-    title: 'Actually Useful',
-    desc: 'Not another gimmick. I\'MU is designed to be genuinely helpful — scheduling, reminders, quick answers.',
+    title: 'Smart Scheduling',
+    desc: 'AI-powered timetable management with natural language. Set reminders, track classes, never miss a lecture.',
   },
   {
     icon: ShieldCheck,
-    title: 'Private by Default',
-    desc: 'Your conversations stay yours. No data selling, no tracking, no nonsense.',
-  },
-  {
-    icon: Code,
-    title: 'Code & Build',
-    desc: 'Generate, explain, and debug code in any language. From Python scripts to full Flutter apps.',
+    title: 'Privacy Controls',
+    desc: 'Hide from search, block friend requests, control who sees you. Your profile, your rules.',
   },
   {
     icon: Search,
-    title: 'Deep Research',
-    desc: 'Dive into complex topics. I\'MU breaks down concepts, finds sources, and presents clear findings.',
+    title: 'Proactive Check-ins',
+    desc: 'Your companion reaches out morning, afternoon, evening & night — because real friends don\'t wait to be asked.',
   },
 ];
 
@@ -498,8 +498,8 @@ export default function Home() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 sm:gap-8">
             {[
               { step: '01', title: 'Download', desc: 'Grab the APK from our download page. Under 22 MB.' },
-              { step: '02', title: 'Open & Talk', desc: 'No sign-up wall. Open the app and start chatting. That simple.' },
-              { step: '03', title: 'It Learns', desc: 'The more you talk, the better it gets. It remembers your style.' },
+              { step: '02', title: 'Open & Talk', desc: 'Sign up, pick your companion, and start chatting. That simple.' },
+              { step: '03', title: 'IMU Heart', desc: 'Our fine-tuned model learns your style. Real Banglish conversations.' },
             ].map((s, i) => (
               <div key={i} className="text-center">
                 <p
@@ -548,8 +548,8 @@ export default function Home() {
               </h2>
               <p className="text-sm sm:text-base leading-relaxed" style={{ color: '#5C6B62' }}>
                 Conversations are encrypted end-to-end. We don&apos;t read them, sell them, or use
-                them to train models. No analytics that follow you around. No ads. No nonsense.
-                Delete everything anytime from the app.
+                them to train models. Control who sees you in search, who can send friend requests,
+                and when your companion reaches out. Delete everything anytime from the app.
               </p>
             </div>
           </div>

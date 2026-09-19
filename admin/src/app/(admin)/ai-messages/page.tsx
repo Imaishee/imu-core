@@ -46,26 +46,30 @@ export default function AIMessagesPage() {
         </div>
       ) : (
         <div className="space-y-2">
-          {messages.map((msg: any) => (
-            <div key={msg.id} className="bg-[#0a0a0b] border border-[#1a1a1e] rounded-xl p-4 hover:border-[#2a2a2e] transition-colors">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-[11px] font-medium text-green-400">AI</span>
-                {msg.model && (
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#1a1a1e] text-zinc-600">{msg.model}</span>
-                )}
-                {msg.intent && (
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400">{msg.intent}</span>
-                )}
-                {msg.mood && (
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400">{msg.mood}</span>
-                )}
-                <span className="text-[10px] text-zinc-700 ml-auto">
-                  {new Date(msg.created_at).toLocaleString()}
-                </span>
+          {messages.map((msg: any) => {
+            const userName = msg.profiles?.name || msg.user_id?.slice(0, 8) || '?';
+            return (
+              <div key={msg.id} className="bg-[#0a0a0b] border border-[#1a1a1e] rounded-xl p-4 hover:border-[#2a2a2e] transition-colors">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-[11px] font-medium text-green-400">AI</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-400">{userName}</span>
+                  {msg.model && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#1a1a1e] text-zinc-600">{msg.model}</span>
+                  )}
+                  {msg.intent && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400">{msg.intent}</span>
+                  )}
+                  {msg.mood && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400">{msg.mood}</span>
+                  )}
+                  <span className="text-[10px] text-zinc-700 ml-auto">
+                    {new Date(msg.created_at).toLocaleString()}
+                  </span>
+                </div>
+                <p className="text-sm text-zinc-300 whitespace-pre-wrap">{msg.content || msg.response}</p>
               </div>
-              <p className="text-sm text-zinc-300 whitespace-pre-wrap">{msg.content || msg.response}</p>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

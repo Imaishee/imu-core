@@ -10,51 +10,73 @@ import {
   Cpu,
   Cloud,
   Database,
+  Users,
+  Heart,
+  MapPin,
+  Bell,
 } from 'lucide-react';
 
 const features = [
   {
+    icon: Heart,
+    title: 'IMU Heart Model',
+    desc: 'Our custom fine-tuned model trained on real Banglish/Hinglish conversations. Not generic AI — an AI that speaks your language, knows your culture, and feels real.',
+    details: ['Fine-tuned transformer model', 'Banglish/Hinglish native', 'Dataset-grounded responses', 'Two-layer architecture (IMU Heart → Groq polish)'],
+  },
+  {
+    icon: Users,
+    title: 'Friends Chat',
+    desc: 'Connect with classmates and friends. Real-time one-on-one messaging with read receipts. Find users by name or email and send friend requests.',
+    details: ['Real-time Supabase messaging', 'Read receipts (✓/✓✓)', 'Friend request system', 'Online presence indicators'],
+  },
+  {
+    icon: ShieldCheck,
+    title: 'Privacy Controls',
+    desc: 'Full control over your visibility. Hide from search, block friend requests, or stay completely invisible. Your profile, your rules.',
+    details: ['Visible/invisible toggle', 'Block friend requests', 'No data selling', 'Delete anytime'],
+  },
+  {
     icon: MessageCircle,
     title: 'Smart Conversations',
-    desc: 'I\'MU uses advanced language models to understand context, follow multi-turn conversations, and give genuinely useful responses. Not template answers — real understanding.',
-    details: ['Context-aware responses', 'Multi-turn memory', 'Natural language understanding'],
-  },
-  {
-    icon: Brain,
-    title: 'Deep Research Mode',
-    desc: 'Need to understand a complex topic? I\'MU can dive deep, break down concepts, find sources, and present findings in a clear, digestible format.',
-    details: ['Source-backed answers', 'Concept breakdowns', 'Visual summaries'],
-  },
-  {
-    icon: Palette,
-    title: 'Artifact Generation',
-    desc: 'From code snippets to formatted documents, I\'MU creates rich artifacts right in your chat. View, copy, or download them instantly.',
-    details: ['Code generation', 'Document creation', 'Visual outputs'],
+    desc: 'I\'MU uses advanced language models to understand context, follow multi-turn conversations, and give genuinely useful responses.',
+    details: ['Context-aware responses', 'Multi-turn memory', 'Natural language understanding', 'IMU Heart seed responses'],
   },
   {
     icon: Calendar,
     title: 'Schedule & Reminders',
-    desc: 'Talk naturally about your schedule. I\'MU understands time references, sets reminders, and keeps you on track without you lifting a finger.',
-    details: ['Natural language scheduling', 'Smart reminders', 'Timetable management'],
+    desc: 'AI-powered timetable management. Talk naturally about your schedule — I\'MU understands time references and keeps you on track.',
+    details: ['Natural language scheduling', 'Smart reminders', 'Timetable management', 'Class notifications'],
+  },
+  {
+    icon: Bell,
+    title: 'Proactive Check-ins',
+    desc: 'Your companion reaches out 4 times a day — morning, afternoon, evening, and night. Real friends don\'t wait to be asked how you are.',
+    details: ['4 daily check-ins', 'Gender-aware messages', 'Push notifications', 'Respects your visibility settings'],
+  },
+  {
+    icon: MapPin,
+    title: 'Location Sharing',
+    desc: 'Optional location sharing helps find nearby classmates. Updates every 15 minutes. You can disable it anytime.',
+    details: ['Periodic background updates', 'Find nearby friends', 'Privacy-first design', 'Manual refresh option'],
   },
   {
     icon: Mic,
-    title: 'Voice Interaction',
-    desc: 'Speak instead of type. I\'MU listens and responds with natural voice output. Perfect for when your hands are busy.',
-    details: ['Speech-to-text input', 'Text-to-speech output', 'Hands-free mode'],
+    title: 'Voice & Vision',
+    desc: 'Speak instead of type, or snap a photo of your notes. I\'MU parses images, understands speech, and responds naturally.',
+    details: ['Speech-to-text input', 'Image parsing (timetable)', 'Hands-free mode', 'Quick capture'],
   },
   {
-    icon: ShieldCheck,
-    title: 'Privacy First',
-    desc: 'Your data stays on your device. Conversations are encrypted. No tracking, no ads, no data selling. This is how AI should work.',
-    details: ['Local-first storage', 'Encrypted sync', 'Zero tracking'],
+    icon: Brain,
+    title: 'Deep Research Mode',
+    desc: 'Need to understand a complex topic? I\'MU dives deep, breaks down concepts, and presents findings clearly.',
+    details: ['Source-backed answers', 'Concept breakdowns', 'Visual summaries', 'Multi-model routing'],
   },
 ];
 
 const specs = [
-  { icon: Cpu, label: 'AI Models', value: 'OpenAI + Groq', desc: 'Fast, accurate, multimodal' },
-  { icon: Cloud, label: 'Sync', value: 'Real-time', desc: 'Cloud sync with local fallback' },
-  { icon: Database, label: 'Storage', value: 'Encrypted', desc: 'Your data, your device' },
+  { icon: Cpu, label: 'AI Models', value: 'IMU Heart + Groq', desc: 'Fine-tuned + polished responses' },
+  { icon: Cloud, label: 'Sync', value: 'Real-time', desc: 'Cloud sync with Supabase Realtime' },
+  { icon: Database, label: 'Storage', value: 'Encrypted', desc: 'Your data, your device, your rules' },
 ];
 
 export default function Features() {

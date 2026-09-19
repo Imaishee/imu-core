@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme/app_theme.dart';
+import 'friend_chat_screen.dart';
+import 'user_search_screen.dart';
 
 /// Screen for managing friends and user-to-user chat
 class FriendsScreen extends StatefulWidget {
@@ -30,26 +32,22 @@ class _FriendsScreenState extends State<FriendsScreen> {
       if (user == null) return;
 
       // Load accepted friends
-      final { data: friends, error: friendsError } = await Supabase.instance.client
+      final friends = await Supabase.instance.client
           .from('friends')
           .select('*, profiles!friends_friend_id_fkey(id, name, companion_gender)')
           .eq('user_id', user.id)
-          .eq('status', 'accepted');
+          .eq('status', 'accepted') as List<Map<String, dynamic>>;
 
-      if (friendsError == null && friends != null) {
-        _friends = friends;
-      }
+      _friends = friends;
 
       // Load pending requests (received)
-      final { data: pending, error: pendingError } = await Supabase.instance.client
+      final pending = await Supabase.instance.client
           .from('friends')
           .select('*, profiles!friends_user_id_fkey(id, name, companion_gender)')
           .eq('friend_id', user.id)
-          .eq('status', 'pending');
+          .eq('status', 'pending') as List<Map<String, dynamic>>;
 
-      if (pendingError == null && pending != null) {
-        _pendingRequests = pending;
-      }
+      _pendingRequests = pending;
     } catch (e) {
       debugPrint('Error loading friends: $e');
     }
@@ -64,16 +62,15 @@ class _FriendsScreenState extends State<FriendsScreen> {
 
     try {
       final user = Supabase.instance.client.auth.currentUser;
-      final { data, error } = await Supabase.instance.client
+      final data = await Supabase.instance.client
           .from('profiles')
           .select('id, name, email')
           .neq('id', user!.id)
+          .eq('is_visible', true)
           .ilike('name', '%$query%')
-          .limit(10);
+          .limit(10) as List<Map<String, dynamic>>;
 
-      if (error == null && data != null) {
-        setState(() => _searchResults = data);
-      }
+      setState(() => _searchResults = data);
     } catch (e) {
       debugPrint('Error searching users: $e');
     }
@@ -83,6 +80,23 @@ class _FriendsScreenState extends State<FriendsScreen> {
     try {
       final user = Supabase.instance.client.auth.currentUser;
       if (user == null) return;
+
+      // Check if target allows friend requests
+      final profile = await Supabase.instance.client
+          .from('profiles')
+          .select('allow_friend_requests')
+          .eq('id', friendId)
+          .maybeSingle();
+
+      if (profile != null && profile['allow_friend_requests'] == false) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('This user is not accepting friend requests'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        return;
+      }
 
       await Supabase.instance.client.from('friends').insert({
         'user_id': user.id,
@@ -313,9 +327,15 @@ class _FriendsScreenState extends State<FriendsScreen> {
                             subtitle: Text('Tap to chat', style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
                             trailing: Icon(Icons.chevron_right, color: AppTheme.textMuted),
                             onTap: () {
-                              // TODO: Open chat with friend
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Friend chat coming soon! 💬')),
+                              final profile = friend['profiles'] ?? {};
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => FriendChatScreen(
+                                    friendId: friend['friend_id'] ?? friend['id'] ?? '',
+                                    friendName: profile['name'] ?? 'Friend',
+                                  ),
+                                ),
                               );
                             },
                           );
@@ -330,60 +350,9 @@ class _FriendsScreenState extends State<FriendsScreen> {
   }
 
   void _showAddFriendDialog() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: AppTheme.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        return Container(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppTheme.textMuted,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(height: 20),
-              Text(
-                'Add Friend',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.textMain,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Search by name to send a friend request',
-                style: TextStyle(color: AppTheme.textMuted),
-              ),
-              const SizedBox(height: 16),
-              // This would open the full search screen
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    // Focus on search field
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.greenPrimary,
-                    foregroundColor: Colors.white,
-                  ),
-                  child: const Text('Search Friends'),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const UserSearchScreen()),
+    ).then((_) => _loadFriends()); // Refresh on return
   }
 }

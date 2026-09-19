@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../constants/app_constants.dart';
 import '../theme/app_theme.dart';
+import '../services/ai_companion_service.dart';
+import '../services/location_service.dart';
+import '../services/update_service.dart';
 import 'gender_selection_screen.dart';
+import 'friends_screen.dart';
+import 'user_search_screen.dart';
+import 'update_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   final VoidCallback? onToggleTheme;
@@ -19,6 +24,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _saving = false;
   bool _checkingUpdate = false;
   bool _notifEnabled = true;
+  bool _isVisible = true;
+  bool _allowFriendRequests = true;
   int _beforeMin = 10;
 
   final _nameCtrl = TextEditingController();
@@ -62,6 +69,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _notifEnabled = prefs.getBool('notif_enabled') ?? true;
       _beforeMin = prefs.getInt('notif_before_min') ?? 10;
       _selectedModel = prefs.getString('selected_model') ?? 'openai/gpt-oss-120b';
+      _isVisible = profile['is_visible'] ?? true;
+      _allowFriendRequests = profile['allow_friend_requests'] ?? true;
       setState(() {});
     }
   }
@@ -94,6 +103,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (mounted) setState(() => _saving = false);
   }
 
+  Future<void> _savePrivacySetting(String field, dynamic value) async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) return;
+    try {
+      await Supabase.instance.client.from('profiles').update({
+        field: value,
+        'updated_at': DateTime.now().toIso8601String(),
+      }).eq('id', user.id);
+    } catch (e) {
+      debugPrint('Privacy save error: $e');
+    }
+  }
+
   Future<void> _checkUpdate() async {
     setState(() => _checkingUpdate = true);
     try {
@@ -106,15 +128,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final hasUpdate = latest != null && latest != AppConstants.appVersion;
       if (mounted) {
         if (hasUpdate) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text('Update available: v$latest'),
-            backgroundColor: AppColors.greenPrimary,
-            behavior: SnackBarBehavior.floating,
-          ));
-          final url = data['download_url'] as String?;
-          if (url != null && url.isNotEmpty) {
-            await launchUrl(Uri.parse(url));
-          }
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => UpdateScreen(
+                updateInfo: UpdateInfo(
+                  updateAvailable: true,
+                  latestVersion: latest,
+                  currentVersion: AppConstants.appVersion,
+                  downloadUrl: data['download_url'] ?? '',
+                  releaseNotes: data['release_notes'] ?? '',
+                  forceUpdate: data['force_update'] ?? false,
+                ),
+              ),
+            ),
+          );
         } else {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('You are up to date!')));
         }
@@ -233,13 +261,182 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Companion Gender', style: TextStyle(color: AppTheme.textMain, fontWeight: FontWeight.w500)),
-                      Text('Choose your AI companion', style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
+                      Text('Companion Personality', style: TextStyle(color: AppTheme.textMain, fontWeight: FontWeight.w500)),
+                      Text('Choose your AI companion\'s gender & style', style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
                     ],
                   ),
                 ),
                 Icon(Icons.chevron_right, color: AppTheme.textMuted),
               ]),
+            ),
+            const SizedBox(height: 8),
+            GlassCard(
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+              child: Row(children: [
+                Icon(Icons.psychology_outlined, color: AppColors.greenMedium, size: 20),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('IMU Heart Model', style: TextStyle(color: AppTheme.textMain, fontWeight: FontWeight.w500)),
+                      Text('Fine-tuned on Banglish/Hinglish conversations', style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: AppColors.greenPrimary.withAlpha(25),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Text('Active', style: TextStyle(color: AppColors.greenPrimary, fontSize: 10, fontWeight: FontWeight.w600)),
+                ),
+              ]),
+            ),
+
+            // ── Privacy
+            _section('Privacy'),
+            GlassCard(
+              padding: EdgeInsets.zero,
+              child: Column(
+                children: [
+                  SwitchListTile(
+                    value: _isVisible,
+                    onChanged: (v) {
+                      setState(() => _isVisible = v);
+                      _savePrivacySetting('is_visible', v);
+                    },
+                    title: Text('Visible in Search', style: TextStyle(color: AppTheme.textMain)),
+                    subtitle: Text(
+                      _isVisible
+                          ? 'Others can find you when searching'
+                          : 'Hidden from user search',
+                      style: TextStyle(color: AppTheme.textMuted, fontSize: 12),
+                    ),
+                    secondary: Icon(
+                      _isVisible ? Icons.visibility : Icons.visibility_off,
+                      color: _isVisible ? AppColors.greenMedium : AppTheme.textMuted,
+                      size: 20,
+                    ),
+                  ),
+                  Divider(color: AppTheme.border, height: 1),
+                  SwitchListTile(
+                    value: _allowFriendRequests,
+                    onChanged: (v) {
+                      setState(() => _allowFriendRequests = v);
+                      _savePrivacySetting('allow_friend_requests', v);
+                    },
+                    title: Text('Allow Friend Requests', style: TextStyle(color: AppTheme.textMain)),
+                    subtitle: Text(
+                      _allowFriendRequests
+                          ? 'Anyone can send you friend requests'
+                          : 'No one can send you friend requests',
+                      style: TextStyle(color: AppTheme.textMuted, fontSize: 12),
+                    ),
+                    secondary: Icon(
+                      _allowFriendRequests ? Icons.person_add : Icons.block,
+                      color: _allowFriendRequests ? AppColors.greenMedium : AppTheme.textMuted,
+                      size: 20,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // ── Friends
+            _section('Friends'),
+            GlassCard(
+              onTap: () {
+                Navigator.push(context, MaterialPageRoute(
+                  builder: (_) => const FriendsScreen(),
+                ));
+              },
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+              child: Row(children: [
+                Icon(Icons.people_outline, color: AppColors.greenMedium, size: 20),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('My Friends', style: TextStyle(color: AppTheme.textMain, fontWeight: FontWeight.w500)),
+                      Text('View friends & pending requests', style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right, color: AppTheme.textMuted),
+              ]),
+            ),
+            const SizedBox(height: 8),
+            GlassCard(
+              onTap: () {
+                Navigator.push(context, MaterialPageRoute(
+                  builder: (_) => const UserSearchScreen(),
+                ));
+              },
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+              child: Row(children: [
+                Icon(Icons.person_add_outlined, color: AppColors.greenMedium, size: 20),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Add Friends', style: TextStyle(color: AppTheme.textMain, fontWeight: FontWeight.w500)),
+                      Text('Search users by name or email', style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right, color: AppTheme.textMuted),
+              ]),
+            ),
+
+            // ── Location
+            _section('Location'),
+            GlassCard(
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+              child: Column(
+                children: [
+                  Row(children: [
+                    Icon(Icons.location_on_outlined, color: AppColors.greenMedium, size: 20),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Location Sharing', style: TextStyle(color: AppTheme.textMain, fontWeight: FontWeight.w500)),
+                          Text('Helps find nearby classmates (updates every 15 min)', style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
+                        ],
+                      ),
+                    ),
+                    Icon(Icons.check_circle, color: AppColors.greenPrimary, size: 18),
+                  ]),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () async {
+                            await LocationService.captureAndSave();
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Location updated!')),
+                              );
+                            }
+                          },
+                          icon: const Icon(Icons.refresh, size: 16),
+                          label: const Text('Update Now'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppColors.greenPrimary,
+                            side: BorderSide(color: AppColors.greenPrimary.withAlpha(60)),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
 
             // ── Timetable settings
@@ -417,10 +614,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(color: AppColors.greenMint.withAlpha(40), borderRadius: BorderRadius.circular(14)),
                       child: Text(
-                        'I\'MU helps you study smarter with a caring AI partner who knows your schedule, your courses, and always has your back.',
+                        'I\'MU helps you study smarter with a caring AI partner who knows your schedule, your courses, and always has your back. Now with IMU Heart fine-tuned model for natural Banglish conversations.',
                         textAlign: TextAlign.center,
                         style: TextStyle(color: AppTheme.textMuted, fontSize: 12, fontStyle: FontStyle.italic),
                       ),
+                    ),
+                    const SizedBox(height: 12),
+                    // Feature badges
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      alignment: WrapAlignment.center,
+                      children: [
+                        _badge('IMU Heart'),
+                        _badge('Friends Chat'),
+                        _badge('Push Alerts'),
+                        _badge('Vision Parse'),
+                      ],
                     ),
                     const SizedBox(height: 16),
                     Text('Made with ❤️ by', style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
@@ -465,6 +675,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Padding(
       padding: const EdgeInsets.only(top: 20, bottom: 8, left: 4),
       child: Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.greenMedium, letterSpacing: 0.6)),
+    );
+  }
+
+  Widget _badge(String text) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppColors.greenPrimary.withAlpha(15),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: AppColors.greenPrimary.withAlpha(30)),
+      ),
+      child: Text(text, style: const TextStyle(color: AppColors.greenPrimary, fontSize: 10, fontWeight: FontWeight.w600)),
     );
   }
 

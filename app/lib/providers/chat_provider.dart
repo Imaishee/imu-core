@@ -6,6 +6,7 @@ import '../services/ai_actions_service.dart';
 import '../services/ai_companion_service.dart';
 import '../services/chat_service.dart';
 import '../services/chat_sync_service.dart';
+import '../services/imu_heart_service.dart';
 import '../services/local_storage.dart';
 import '../services/timetable_service.dart';
 import '../services/vision_service.dart';
@@ -257,17 +258,37 @@ class MessagesNotifier extends Notifier<List<ChatMessage>> {
       final isAICompanion = _conversationId == 'ai-companion';
 
       if (isAICompanion) {
-        // Use AI Companion service for personality-driven responses
+        // ─── Two-Layer Architecture ──────────────────────────────────
+        // Layer 1: IMU Heart HF Space generates dataset-grounded seed
+        // Layer 2: ai-companion edge function polishes via Groq API
         final companionGender = await AICompanionService.getCompanionGender();
-        final history = apiMessages.length > 1 
-            ? apiMessages.sublist(0, apiMessages.length - 1) // All but current message
+        final List<Map<String, dynamic>> history = apiMessages.length > 1
+            ? apiMessages.sublist(0, apiMessages.length - 1).cast<Map<String, dynamic>>()
             : [];
 
+        // Layer 1: Get seed from IMU Heart (non-blocking, fails gracefully)
+        String? imuHeartSeed;
+        try {
+          final seedResult = await ImuHeartService.generateSeed(
+            message: content,
+            companionGender: companionGender,
+            conversationHistory: history,
+          );
+          if (!seedResult.isEmpty) {
+            imuHeartSeed = seedResult.response;
+            print('[ChatProvider] IMU Heart seed: $imuHeartSeed');
+          }
+        } catch (e) {
+          print('[ChatProvider] IMU Heart seed failed (non-fatal): $e');
+        }
+
+        // Layer 2: Pass seed to edge function for Groq polish
         try {
           final result = await AICompanionService.sendMessage(
             message: content,
             conversationHistory: history,
             companionGender: companionGender,
+            imuHeartSeed: imuHeartSeed,
           );
 
           final aiMessage = result['message'] ?? 'Hmm... ki bolbo 😶';

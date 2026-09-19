@@ -146,7 +146,7 @@ class UpdateService {
       int received = 0;
       final sink = file.openWrite();
 
-      await for (final chunk in response.asStream()) {
+      await for (final chunk in response) {
         sink.add(chunk);
         received += chunk.length;
 
