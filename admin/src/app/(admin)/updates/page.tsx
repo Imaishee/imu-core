@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { createClient } from '@supabase/supabase-js';
 
 interface AppVersion {
   id: string;
@@ -61,13 +60,8 @@ export default function UpdatesPage() {
     setFormError('');
     let downloadUrl = formUrl.trim();
 
-    // ─── Step 1: Upload APK directly to Supabase Storage (if file chosen) ───
+    // ─── Step 1: Upload APK via server API (if file chosen) ─────────────────
     if (formFile) {
-      const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://cxiicvirllfdvcjwwcbj.supabase.co',
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-      );
-
       const fileName = `IMU-v${formVersion.trim()}-arm64.apk`;
       setUpload({
         status: 'uploading', progress: 0, fileName, fileSize: formFile.size,
@@ -75,16 +69,17 @@ export default function UpdatesPage() {
       });
 
       try {
-        // Use XMLHttpRequest for upload progress tracking
+        const formData = new FormData();
+        formData.append('file', formFile);
+        formData.append('version', formVersion.trim());
+
+        // Use XMLHttpRequest for progress tracking
         await new Promise<void>((resolve, reject) => {
           const xhr = new XMLHttpRequest();
 
           xhr.upload.addEventListener('progress', (e) => {
             if (e.lengthComputable) {
               const pct = Math.round((e.loaded / e.total) * 100);
-              const speedBytes = e.loaded; // We'll calculate speed from timestamps
-              const remaining = e.total - e.loaded;
-
               setUpload(prev => ({
                 ...prev,
                 progress: pct,
@@ -95,29 +90,29 @@ export default function UpdatesPage() {
 
           xhr.addEventListener('load', () => {
             if (xhr.status >= 200 && xhr.status < 300) {
-              resolve();
+              try {
+                const resp = JSON.parse(xhr.responseText);
+                downloadUrl = resp.downloadUrl || downloadUrl;
+                resolve();
+              } catch {
+                reject(new Error('Invalid response from server'));
+              }
             } else {
-              reject(new Error(`Upload failed: HTTP ${xhr.status} ${xhr.statusText}`));
+              try {
+                const resp = JSON.parse(xhr.responseText);
+                reject(new Error(resp.error || `Upload failed: HTTP ${xhr.status}`));
+              } catch {
+                reject(new Error(`Upload failed: HTTP ${xhr.status}`));
+              }
             }
           });
 
           xhr.addEventListener('error', () => reject(new Error('Network error during upload')));
           xhr.addEventListener('abort', () => reject(new Error('Upload cancelled')));
 
-          const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://cxiicvirllfdvcjwwcbj.supabase.co';
-          const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-          const uploadUrl = `${supabaseUrl}/storage/v1/object/apk-downloads/${fileName}`;
-
-          xhr.open('POST', uploadUrl, true);
-          xhr.setRequestHeader('Authorization', `Bearer ${anonKey}`);
-          xhr.setRequestHeader('Content-Type', 'application/vnd.android.package-archive');
-          xhr.setRequestHeader('x-upsert', 'true');
-          xhr.send(formFile);
+          xhr.open('POST', '/api/upload-apk', true);
+          xhr.send(formData);
         });
-
-        // Build public URL
-        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://cxiicvirllfdvcjwwcbj.supabase.co';
-        downloadUrl = `${supabaseUrl}/storage/v1/object/public/apk-downloads/${fileName}`;
       } catch (e: any) {
         setUpload(prev => ({ ...prev, status: 'error', error: e.message || 'Upload failed' }));
         return;
