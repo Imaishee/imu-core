@@ -200,13 +200,25 @@ class _ImuAppState extends State<ImuApp> {
         body: {'version': AppConstants.appVersion},
       );
       if (resp.data != null && resp.data['update_available'] == true) {
-        if (mounted) {
-          setState(() {
-            _latestVersion = resp.data['latest_version'];
-            _updateUrl = resp.data['download_url'];
-            _updateNotes = resp.data['release_notes'];
-            _forceUpdate = resp.data['force_update'] ?? false;
-          });
+        _latestVersion = resp.data['latest_version'];
+        _updateUrl = resp.data['download_url'];
+        _updateNotes = resp.data['release_notes'];
+        _forceUpdate = resp.data['force_update'] ?? false;
+
+        if (mounted) setState(() {});
+
+        // Auto-start background download immediately (non-blocking)
+        if (_updateUrl != null && _updateUrl!.isNotEmpty) {
+          final info = UpdateInfo(
+            updateAvailable: true,
+            latestVersion: _latestVersion ?? '',
+            currentVersion: AppConstants.appVersion,
+            downloadUrl: _updateUrl!,
+            releaseNotes: _updateNotes ?? '',
+            forceUpdate: _forceUpdate,
+          );
+          // Fire-and-forget: download runs in background, notification shows progress
+          UpdateService().downloadAndInstall(info);
         }
       }
     } catch (_) {}

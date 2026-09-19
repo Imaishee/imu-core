@@ -50,7 +50,7 @@ class UpdateService {
   static const _channelDesc = 'Shows download progress for app updates';
   static const _notificationId = 9999;
 
-  bool _downloading = false;
+  static bool _downloading = false;
   bool get isDownloading => _downloading;
 
   Future<UpdateInfo?> checkForUpdate() async {
