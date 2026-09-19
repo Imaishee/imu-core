@@ -2,53 +2,43 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabase } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
-export const maxDuration = 300; // 5 minutes for large APK uploads
 
+// Generate a signed upload URL so the client can upload directly to Supabase Storage
+// This avoids Vercel's 4.5MB body limit — the file never touches our serverless function
 export async function POST(req: NextRequest) {
   try {
-    const formData = await req.formData();
-    const file = formData.get('file') as File | null;
-    const version = formData.get('version') as string | null;
+    const { version } = await req.json();
 
-    if (!file) {
-      return NextResponse.json({ error: 'No file provided' }, { status: 400 });
-    }
     if (!version) {
       return NextResponse.json({ error: 'Version is required' }, { status: 400 });
     }
 
-    const fileName = `IMU-v${version.trim()}-arm64.apk`;
     const supabase = getSupabase();
+    const fileName = `IMU-v${version.trim()}-arm64.apk`;
 
-    // Convert File to ArrayBuffer then to Buffer for Supabase upload
-    const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-
-    // Upload to Supabase Storage using service_role key (bypasses RLS)
-    const { data: uploadData, error: uploadError } = await supabase.storage
+    // Create signed upload URL using service_role (bypasses RLS)
+    const { data, error } = await supabase.storage
       .from('apk-downloads')
-      .upload(fileName, buffer, {
-        contentType: 'application/vnd.android.package-archive',
-        upsert: true,
-      });
+      .createSignedUploadUrl(fileName);
 
-    if (uploadError) {
-      console.error('[UploadAPK] Storage error:', uploadError);
-      return NextResponse.json({ error: `Storage upload failed: ${uploadError.message}` }, { status: 500 });
+    if (error) {
+      console.error('[SignedURL] Error:', error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    // Get the public URL
+    // Also get the public URL for later use
     const { data: urlData } = supabase.storage
       .from('apk-downloads')
       .getPublicUrl(fileName);
 
     return NextResponse.json({
-      ok: true,
+      signedUrl: data.signedUrl,
+      path: data.path,
       downloadUrl: urlData.publicUrl,
-      path: uploadData?.path || fileName,
+      fileName,
     });
   } catch (e: any) {
-    console.error('[UploadAPK] Error:', e);
-    return NextResponse.json({ error: e.message || 'Upload failed' }, { status: 500 });
+    console.error('[SignedURL] Error:', e);
+    return NextResponse.json({ error: e.message || 'Failed to create signed URL' }, { status: 500 });
   }
 }

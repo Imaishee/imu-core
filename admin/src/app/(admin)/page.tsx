@@ -40,7 +40,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     fetchAll();
-    const interval = setInterval(fetchAll, 15000);
+    const interval = setInterval(fetchAll, 10000); // refresh every 10s
     return () => clearInterval(interval);
   }, [fetchAll]);
 

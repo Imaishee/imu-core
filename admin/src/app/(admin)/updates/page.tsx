@@ -60,7 +60,7 @@ export default function UpdatesPage() {
     setFormError('');
     let downloadUrl = formUrl.trim();
 
-    // ─── Step 1: Upload APK via server API (if file chosen) ─────────────────
+    // ─── Step 1: Upload APK via signed URL (if file chosen) ─────────────────
     if (formFile) {
       const fileName = `IMU-v${formVersion.trim()}-arm64.apk`;
       setUpload({
@@ -69,11 +69,19 @@ export default function UpdatesPage() {
       });
 
       try {
-        const formData = new FormData();
-        formData.append('file', formFile);
-        formData.append('version', formVersion.trim());
+        // Get signed upload URL from server (server uses service_role key)
+        const signedRes = await fetch('/api/upload-apk', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ version: formVersion.trim() }),
+        });
+        const signedData = await signedRes.json();
 
-        // Use XMLHttpRequest for progress tracking
+        if (!signedRes.ok) {
+          throw new Error(signedData.error || 'Failed to get upload URL');
+        }
+
+        // Upload directly to Supabase Storage using the signed URL
         await new Promise<void>((resolve, reject) => {
           const xhr = new XMLHttpRequest();
 
@@ -90,17 +98,12 @@ export default function UpdatesPage() {
 
           xhr.addEventListener('load', () => {
             if (xhr.status >= 200 && xhr.status < 300) {
-              try {
-                const resp = JSON.parse(xhr.responseText);
-                downloadUrl = resp.downloadUrl || downloadUrl;
-                resolve();
-              } catch {
-                reject(new Error('Invalid response from server'));
-              }
+              downloadUrl = signedData.downloadUrl || downloadUrl;
+              resolve();
             } else {
               try {
                 const resp = JSON.parse(xhr.responseText);
-                reject(new Error(resp.error || `Upload failed: HTTP ${xhr.status}`));
+                reject(new Error(resp.message || resp.error || `Upload failed: HTTP ${xhr.status}`));
               } catch {
                 reject(new Error(`Upload failed: HTTP ${xhr.status}`));
               }
@@ -110,8 +113,10 @@ export default function UpdatesPage() {
           xhr.addEventListener('error', () => reject(new Error('Network error during upload')));
           xhr.addEventListener('abort', () => reject(new Error('Upload cancelled')));
 
-          xhr.open('POST', '/api/upload-apk', true);
-          xhr.send(formData);
+          // PUT directly to Supabase Storage signed URL — body never touches Vercel
+          xhr.open('PUT', signedData.signedUrl, true);
+          xhr.setRequestHeader('Content-Type', 'application/vnd.android.package-archive');
+          xhr.send(formFile);
         });
       } catch (e: any) {
         setUpload(prev => ({ ...prev, status: 'error', error: e.message || 'Upload failed' }));

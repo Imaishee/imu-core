@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 
 interface User {
   id: string;
@@ -37,7 +37,11 @@ export default function UsersPage() {
   const [loadingConvos, setLoadingConvos] = useState(false);
   const [search, setSearch] = useState('');
 
-  useEffect(() => { fetchUsers(); }, []);
+  useEffect(() => {
+    fetchUsers();
+    const interval = setInterval(fetchUsers, 10000);
+    return () => clearInterval(interval);
+  }, []);
 
   async function fetchUsers() {
     setLoading(true);

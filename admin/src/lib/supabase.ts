@@ -20,35 +20,43 @@ export function getSupabase() {
 export async function getDashboardStats() {
   const supabase = getClient();
 
-  const [convResult, aiMsgResult, notifResult, friendResult, friendMsgResult, profilesResult] = await Promise.all([
+  const [profilesResult, convResult, msgResult, notifResult, friendResult, friendMsgResult] = await Promise.all([
+    supabase.from('profiles').select('id', { count: 'exact', head: true }),
     supabase.from('conversations').select('id', { count: 'exact', head: true }),
-    supabase.from('ai_messages').select('id', { count: 'exact', head: true }),
+    supabase.from('messages').select('id', { count: 'exact', head: true }),
     supabase.from('notifications').select('id', { count: 'exact', head: true }),
     supabase.from('friends').select('id', { count: 'exact', head: true }),
     supabase.from('friend_messages').select('id', { count: 'exact', head: true }),
-    supabase.from('profiles').select('id', { count: 'exact', head: true }),
   ]);
 
-  // Get user count from profiles (most reliable) with fallback to auth
+  // Users = profiles count (most reliable source)
   let totalUsers = profilesResult.count || 0;
+
+  // Fallback: if profiles count is 0, try auth users
   if (totalUsers === 0) {
     try {
       const { data: authUsers } = await supabase.auth.admin.listUsers({ perPage: 1000 });
       totalUsers = authUsers?.users?.length || 0;
     } catch {
-      // Fallback: count unique user_ids from conversations
+      // Auth admin might not be available with anon key — that's ok
+    }
+  }
+
+  // Fallback: count unique user_ids from conversations
+  if (totalUsers === 0) {
+    try {
       const { data: convData } = await supabase
         .from('conversations')
         .select('user_id')
         .limit(10000);
       totalUsers = new Set((convData || []).map(c => c.user_id).filter(Boolean)).size;
-    }
+    } catch {}
   }
 
   return {
     totalUsers,
     totalConversations: convResult.count || 0,
-    totalMessages: (aiMsgResult.count || 0) + (friendMsgResult.count || 0),
+    totalMessages: (msgResult.count || 0) + (friendMsgResult.count || 0),
     totalNotifications: notifResult.count || 0,
     totalFriends: friendResult.count || 0,
   };
